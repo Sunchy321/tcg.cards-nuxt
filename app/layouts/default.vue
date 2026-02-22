@@ -12,6 +12,6 @@ div(class="min-h-screen flex flex-col bg-linear-to-br")
 </template>
 
 <script setup lang="ts">
-const appName = 'My App'
-const currentYear = new Date().getFullYear()
+const appName = 'My App';
+const currentYear = new Date().getFullYear();
 </script>

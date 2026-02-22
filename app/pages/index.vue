@@ -34,7 +34,7 @@ import { GAMES, type Game } from '@/shared';
 type GameFilter = Game | 'omni';
 
 type GameOption = {
-  id: GameFilter;
+  id:    GameFilter;
   label: string;
 };
 
@@ -43,12 +43,12 @@ definePageMeta({
 });
 
 const gameOptions = [
-  { id: "omni", label: "Omnisearch" },
-  { id: "magic", label: "MTG" },
-  { id: "hearthstone", label: "Hearthstone" },
+  { id: 'omni', label: 'Omnisearch' },
+  { id: 'magic', label: 'MTG' },
+  { id: 'hearthstone', label: 'Hearthstone' },
 ] satisfies GameOption[];
 
-const selectedGame = ref<GameFilter>("omni");
+const selectedGame = ref<GameFilter>('omni');
 
 </script>
 

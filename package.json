@@ -9,9 +9,12 @@
 		"preview": "bun run build && wrangler dev",
 		"postinstall": "nuxt prepare",
 		"deploy": "bun run build && wrangler deploy",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
 	},
 	"dependencies": {
+		"@nuxt/eslint": "1.15.1",
 		"@vueuse/core": "^14.2.1",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
