@@ -10,7 +10,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Game } from '~/shared';
+import type { Game } from '~~/shared';
 
 const route = useRoute();
 

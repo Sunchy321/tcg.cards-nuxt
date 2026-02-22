@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { GAMES } from '~/shared';
+import { GAMES } from '~~/shared';
 
 definePageMeta({
   validate: ({ params }) => {

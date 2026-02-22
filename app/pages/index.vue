@@ -45,7 +45,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '~/components/ui/in
 import { Select } from '~/components/ui/select';
 import { Button } from '~/components/ui/button';
 
-import { GAMES, type Game } from '@/shared';
+import { GAMES, type Game } from '~~/shared';
 
 type GameFilter = Game | 'omni';
 

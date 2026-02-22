@@ -35,3 +35,7 @@ directory = "./.output/public/"
 # [[services]]
 # binding = "MY_SERVICE"
 # service = "my-service"
+
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "34ff130776904528bff88fe51caea444"
