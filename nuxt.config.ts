@@ -14,7 +14,7 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ['nitro-cloudflare-dev', 'shadcn-nuxt', '@nuxt/eslint'],
+  modules: ['nitro-cloudflare-dev', 'shadcn-nuxt', '@nuxt/eslint', '@nuxt/icon'],
 
   shadcn: {
     prefix: '',
@@ -26,5 +26,20 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [tailwindcss()],
+  },
+
+  icon: {
+    customCollections: [
+      {
+        prefix:    'i',
+        dir:       './app/assets/icons/icon',
+        recursive: true,
+      },
+      {
+        prefix:    's',
+        dir:       './app/assets/icons/symbol',
+        recursive: true,
+      },
+    ],
   },
 });

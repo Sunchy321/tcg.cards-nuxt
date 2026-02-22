@@ -11,10 +11,14 @@
 		"deploy": "bun run build && wrangler deploy",
 		"cf-typegen": "wrangler types",
 		"lint": "eslint .",
-		"lint:fix": "eslint . --fix"
+		"lint:fix": "eslint . --fix",
+		"icons:optimize": "bun run icons:icon && bun run icons:symbol",
+		"icons:icon": "svgo -rf ./app/assets/icons/icon --config=svgo-icon.config.mjs",
+		"icons:symbol": "svgo -rf ./app/assets/icons/symbol --config=svgo-symbol.config.mjs"
 	},
 	"dependencies": {
 		"@nuxt/eslint": "1.15.1",
+		"@nuxt/icon": "2.2.1",
 		"@vueuse/core": "^14.2.1",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
@@ -24,13 +28,15 @@
 		"shadcn-nuxt": "^2.4.3",
 		"tailwind-merge": "^3.5.0",
 		"vue": "^3.5.28",
-		"vue-router": "^4.6.4"
+		"vue-router": "^4.6.4",
+		"zod": "^4.3.6"
 	},
 	"devDependencies": {
 		"@tailwindcss/vite": "^4.2.0",
 		"@types/node": "^25.3.0",
 		"nitro-cloudflare-dev": "^0.2.2",
 		"nitropack": "^2.13.1",
+		"svgo": "^4.0.0",
 		"tailwindcss": "^4.2.0",
 		"tw-animate-css": "^1.4.0",
 		"typescript": "^5.9.3",
