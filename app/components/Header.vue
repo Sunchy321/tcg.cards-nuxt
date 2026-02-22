@@ -1,8 +1,10 @@
 <template>
   <header class="fixed top-0 left-0 w-full bg-white/10 backdrop-blur-md border-b border-white/20 z-50">
     <div class="container mx-auto px-6 py-4 flex items-center">
-      <Icon :name="logo" :size="32" class="text-white" />
-      <span class="ml-3 text-white font-semibold text-lg">{{ title }}</span>
+      <NuxtLink :to="homeLink" class="flex items-center hover:opacity-80 transition-opacity">
+        <Icon :name="logo" :size="32" class="text-white" />
+        <span class="ml-3 text-white font-semibold text-lg">{{ title }}</span>
+      </NuxtLink>
     </div>
   </header>
 </template>
@@ -32,5 +34,9 @@ const logo = computed(() => {
 
 const title = computed(() => {
   return currentGame.value ? gameMap[currentGame.value] : 'Welcome';
+});
+
+const homeLink = computed(() => {
+  return currentGame.value ? `/${currentGame.value}` : '/';
 });
 </script>
