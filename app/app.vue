@@ -1,5 +1,7 @@
-<template lang="pug">
-  div
-    NuxtLayout
-      NuxtPage
+<template>
+  <div>
+    <NuxtLayout>
+      <NuxtPage />
+    </NuxtLayout>
+  </div>
 </template>
