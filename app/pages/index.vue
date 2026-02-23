@@ -15,11 +15,11 @@
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <template v-for="game in gameOptions" :key="game.id">
-              <SelectItem :value="game.id" class="text-base py-2">
+            <template v-for="g in games" :key="g">
+              <SelectItem :value="g" class="text-base py-2">
                 <div class="flex items-center gap-2 w-full">
-                  <Icon :name="gameIcon(game.id)" />
-                  <span class="flex-1">{{ game.label }}</span>
+                  <Icon :name="gameIcon(g)" />
+                  <span class="flex-1">{{ gameName(g) }}</span>
                 </div>
               </SelectItem>
             </template>
@@ -30,10 +30,10 @@
     </InputGroup>
 
     <div class="flex gap-4">
-      <NuxtLink v-for="game in gameOptions" :key="game.id" :to="`/${game.id}`">
+      <NuxtLink v-for="g in games" :key="g" :to="`/${g}`">
         <Button class="flex items-center gap-2">
-          <Icon :name="gameIcon(game.id)" class="w-5 h-5 text-white" />
-          <span>{{ game.label }}</span>
+          <Icon :name="gameIcon(g)" class="w-5 h-5 text-white" />
+          <span>{{ gameName(g) }}</span>
         </Button>
       </NuxtLink>
     </div>
@@ -41,30 +41,20 @@
 </template>
 
 <script setup lang="ts">
-import { InputGroup, InputGroupAddon, InputGroupInput } from '~/components/ui/input-group';
-import { Select } from '~/components/ui/select';
-import { Button } from '~/components/ui/button';
-
 import { GAMES, type Game } from '~~/shared';
 
-const { $orpc } = useNuxtApp();
+const i18n = useI18n();
+const title = useTitle();
 
 type GameFilter = Game | 'omni';
-
-type GameOption = {
-  id:    GameFilter;
-  label: string;
-};
 
 definePageMeta({
   layout: 'main',
 });
 
-const gameOptions = [
-  { id: 'omni', label: 'Omnisearch' },
-  { id: 'magic', label: 'MTG' },
-  { id: 'hearthstone', label: 'Hearthstone' },
-] satisfies GameOption[];
+title.value = 'tcg.cards';
+
+const games = ['omni', ...GAMES] as const;
 
 const selectedGame = ref<GameFilter>('omni');
 
@@ -73,6 +63,13 @@ function gameIcon(gameId: GameFilter) {
     return 'i:logo';
   }
   return `i:${gameId}-logo`;
+}
+
+function gameName(gameId: GameFilter) {
+  if (gameId === 'omni') {
+    return i18n.t('omni.$self');
+  }
+  return i18n.t(`${gameId}.$self`);
 }
 
 </script>

@@ -7,11 +7,15 @@
 </template>
 
 <script setup lang="ts">
-import { InputGroup, InputGroupAddon, InputGroupInput } from '~/components/ui/input-group';
+const route = useRoute();
+const i18n = useI18n();
+const title = useTitle();
 
 definePageMeta({
   layout: 'main',
 });
+
+title.value = i18n.t(`${route.meta.game!}.$self`);
 
 </script>
 

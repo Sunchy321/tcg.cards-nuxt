@@ -1,0 +1,50 @@
+// import type { LocaleMessageValue } from 'vue-i18n';
+
+// import { GAMES } from '~~/shared';
+
+// const gameI18n = import.meta.glob<LocaleMessageValue>('./*/index.ts', { eager: true, import: 'default' });
+
+import omni from './omni';
+import magic from './magic';
+import hearthstone from './hearthstone';
+
+export default {
+  lang: {
+    '$self': '简体中文',
+
+    'en':  '英语',
+    'de':  '德语',
+    'es':  '西班牙语',
+    'fr':  '法语',
+    'it':  '意大利语',
+    'ja':  '日语',
+    'ko':  '韩语',
+    'mx':  '墨西哥语',
+    'pl':  '波兰语',
+    'pt':  '葡萄牙语',
+    'ru':  '俄语',
+    'th':  '泰语',
+    'zhs': '简体中文',
+    'zht': '繁体中文',
+    'he':  '希伯来语',
+    'la':  '拉丁语',
+    'grc': '古希腊语',
+    'ar':  '阿拉伯语',
+    'sa':  '梵文',
+    'ph':  '非瑞克西亚文',
+
+    'en:asia': '英文（亚洲）',
+    'zhs:pro': '简体中文（YGOPro)',
+    'zhs:nw':  '简体中文（NW）',
+    'zhs:cn':  '简体中文（CN）',
+    'zhs:md':  '简体中文（MD）',
+  },
+
+  // omnisearch: gameI18n['./omnisearch/index.ts'],
+
+  // ...Object.fromEntries(GAMES.map(g => [g, gameI18n[`./${g}/index.ts`]])),
+
+  omni,
+  magic,
+  hearthstone,
+};

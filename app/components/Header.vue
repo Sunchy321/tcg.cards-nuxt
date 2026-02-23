@@ -10,11 +10,14 @@
 </template>
 
 <script setup lang="ts">
+
 import type { Game } from '~~/shared';
 
 const route = useRoute();
+const title = useTitle();
 
-const gameMap: Record<Game, string> = {
+const gameMap: Record<Game | 'omni', string> = {
+  omni:        'Omnisearch',
   magic:       'MTG',
   hearthstone: 'Hearthstone',
 };
@@ -30,10 +33,6 @@ const logo = computed(() => {
   }
 
   return `i:${currentGame.value}-logo`;
-});
-
-const title = computed(() => {
-  return currentGame.value ? gameMap[currentGame.value] : 'Welcome';
 });
 
 const homeLink = computed(() => {

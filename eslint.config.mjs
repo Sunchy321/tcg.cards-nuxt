@@ -11,6 +11,7 @@ export default withNuxt()
     extends: [eslint.configs.recommended],
 
     rules: {
+      // 'no-undef':       'off',
       'no-unused-vars': 'off',
     },
   })

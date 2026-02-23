@@ -20,6 +20,7 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxt/icon',
     '@nuxthub/core',
+    '@nuxtjs/i18n',
   ],
 
   shadcn: {
@@ -53,6 +54,19 @@ export default defineNuxtConfig({
     db: {
       dialect: 'postgresql',
       driver:  'postgres-js',
+    },
+  },
+
+  i18n: {
+    defaultLocale: 'en',
+    locales:       [
+      { code: 'en', language: 'en-US', name: 'English', file: 'en/index.ts' },
+      { code: 'zhs', language: 'zh-CN', name: 'Chinese (Simplified)', file: 'zhs/index.ts' },
+    ],
+    strategy:              'no_prefix',
+    detectBrowserLanguage: {
+      useCookie:  true,
+      redirectOn: 'root',
     },
   },
 });

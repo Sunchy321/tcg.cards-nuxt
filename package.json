@@ -20,6 +20,7 @@
 		"@nuxt/eslint": "1.15.1",
 		"@nuxt/icon": "2.2.1",
 		"@nuxthub/core": "0.10.6",
+		"@nuxtjs/i18n": "10.2.3",
 		"@orpc/client": "^1.13.5",
 		"@orpc/server": "^1.13.5",
 		"@orpc/zod": "^1.13.5",
