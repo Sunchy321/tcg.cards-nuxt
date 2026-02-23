@@ -14,7 +14,13 @@ export default defineNuxtConfig({
     },
   },
 
-  modules: ['nitro-cloudflare-dev', 'shadcn-nuxt', '@nuxt/eslint', '@nuxt/icon'],
+  modules: [
+    'nitro-cloudflare-dev',
+    'shadcn-nuxt',
+    '@nuxt/eslint',
+    '@nuxt/icon',
+    '@nuxthub/core',
+  ],
 
   shadcn: {
     prefix: '',
@@ -41,5 +47,12 @@ export default defineNuxtConfig({
         recursive: true,
       },
     ],
+  },
+
+  hub: {
+    db: {
+      dialect: 'postgresql',
+      driver:  'postgres-js',
+    },
   },
 });

@@ -47,6 +47,8 @@ import { Button } from '~/components/ui/button';
 
 import { GAMES, type Game } from '~~/shared';
 
+const { $orpc } = useNuxtApp();
+
 type GameFilter = Game | 'omni';
 
 type GameOption = {
