@@ -1,5 +1,3 @@
-import tailwindcss from '@tailwindcss/vite';
-
 import { fileURLToPath } from 'url';
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
@@ -18,30 +16,27 @@ export default defineNuxtConfig({
 
   modules: [
     'nitro-cloudflare-dev',
-    'shadcn-nuxt',
     '@nuxt/eslint',
     '@nuxt/icon',
     '@nuxthub/core',
     '@nuxtjs/i18n',
+    '@vueuse/nuxt',
+    '@nuxt/ui',
   ],
 
   alias: {
-    '#model': fileURLToPath(new URL('./model', import.meta.url)),
-  },
-
-  shadcn: {
-    prefix: '',
-
-    componentDir: './app/components/ui',
+    '#model':  fileURLToPath(new URL('./model', import.meta.url)),
+    '#schema': fileURLToPath(new URL('./server/db/schema', import.meta.url)),
   },
 
   css: ['~/assets/css/tailwind.css'],
 
-  vite: {
-    plugins: [tailwindcss()],
+  experimental: {
+    typedPages: true,
   },
 
   icon: {
+    provider:          'server',
     customCollections: [
       {
         prefix:    'i',

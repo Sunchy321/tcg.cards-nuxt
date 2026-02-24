@@ -1,29 +1,7 @@
-import { os } from './orpc';
-
-import { z } from 'zod';
-
-import { db } from '@nuxthub/db';
-import { users } from 'hub:db:schema';
-
-const hello = os
-  .input(z.void())
-  .output(z.string())
-  .handler(() => {
-    return 'Hello, oRPC!';
-  });
-
-const test = os
-  .input(z.void())
-  .output(z.object({ count: z.number() }))
-  .handler(async () => {
-    const count = await db.$count(users);
-
-    return { count };
-  });
+import { magicTrpc } from './magic';
 
 export const router = {
-  hello,
-  test,
+  magic: magicTrpc,
 };
 
 export type Router = typeof router;

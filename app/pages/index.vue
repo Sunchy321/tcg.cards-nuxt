@@ -1,40 +1,26 @@
 <template>
   <div class="flex flex-col items-center justify-center h-full py-8 gap-6">
-    <InputGroup class="w-[90%] md:w-[75%] mt-50 text-[150%] md:text-[150%] bg-white h-auto rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden">
-      <InputGroupAddon>
-        <Select v-model="selectedGame">
-          <SelectTrigger class="w-auto h-auto px-4 py-6 border-0 shadow-none">
-            <SelectValue placeholder="Game">
-              <div class="flex items-center gap-2 w-full">
-                <img
-                  :src="selectedGame === 'omni' ? '/favicon.svg' : `/${selectedGame}/logo.svg`"
-                  alt="Logo"
-                  class="w-6 h-6"
-                >
-              </div>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <template v-for="g in games" :key="g">
-              <SelectItem :value="g" class="text-base py-2">
-                <div class="flex items-center gap-2 w-full">
-                  <Icon :name="gameIcon(g)" />
-                  <span class="flex-1">{{ gameName(g) }}</span>
-                </div>
-              </SelectItem>
-            </template>
-          </SelectContent>
-        </Select>
-      </InputGroupAddon>
-      <InputGroupInput class="px-6 py-6" />
-    </InputGroup>
+    <UFieldGroup class="w-[90%] md:w-[75%] mt-50 text-black bg-white rounded-md shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden" size="xl">
+      <USelect v-model="game" :items="gameOptions" :ui="{ content: 'min-w-fit' }">
+        <template #item="{ item }">
+          <div class="flex items-center gap-2 w-full">
+            <Icon :name="item.icon" class="w-5 h-5 text-default" />
+            <span>{{ item.label }}</span>
+          </div>
+        </template>
+        <template #default>
+          <Icon :name="gameIcon(game)" class="w-5 h-5 text-default" />
+        </template>
+      </USelect>
+      <UInput class="flex-1" color="neutral" />
+    </UFieldGroup>
 
     <div class="flex gap-4">
       <NuxtLink v-for="g in games" :key="g" :to="`/${g}`">
-        <Button class="flex items-center gap-2">
+        <UButton class="flex items-center gap-2" color="neutral">
           <Icon :name="gameIcon(g)" class="w-5 h-5 text-white" />
           <span>{{ gameName(g) }}</span>
-        </Button>
+        </UButton>
       </NuxtLink>
     </div>
   </div>
@@ -56,7 +42,7 @@ title.value = 'tcg.cards';
 
 const games = ['omni', ...GAMES] as const;
 
-const selectedGame = ref<GameFilter>('omni');
+const game = ref<GameFilter>('omni');
 
 function gameIcon(gameId: GameFilter) {
   if (gameId === 'omni') {
@@ -71,6 +57,12 @@ function gameName(gameId: GameFilter) {
   }
   return i18n.t(`${gameId}.$self`);
 }
+
+const gameOptions = games.map(g => ({
+  value: g,
+  label: gameName(g),
+  icon:  gameIcon(g),
+}));
 
 </script>
 

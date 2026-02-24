@@ -4,15 +4,20 @@
 	},
 	"git.ignoreLimitWarning": true,
 	"cSpell.words": [
+		"mtga",
 		"mtgch",
 		"mtgo",
 		"nuxthub",
+		"nuxtjs",
 		"omnisearch",
 		"orpc",
+		"tabler",
 		"tcgplayer",
 		"updations",
+		"vueuse",
 		"wubrgc",
 		"wubrgct",
 		"wubrgop"
-	]
+	],
+	"postman.settings.dotenv-detection-notification-visibility": false
 }
