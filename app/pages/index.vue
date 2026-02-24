@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { GAMES, type Game } from '~~/shared';
+import { GAMES, type Game } from '#shared';
 
 const i18n = useI18n();
 const title = useTitle();

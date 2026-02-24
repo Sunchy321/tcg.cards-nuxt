@@ -1,4 +1,4 @@
-import type { Game } from '~~/shared';
+import type { Game } from '#shared';
 
 declare module '#app' {
   interface PageMeta {

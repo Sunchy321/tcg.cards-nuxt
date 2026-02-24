@@ -1,4 +1,4 @@
-import { GAMES, type Game } from '~~/shared';
+import { GAMES, type Game } from '#shared';
 
 export default defineNuxtRouteMiddleware(to => {
   const gamePath = to.path.split('/')[1];

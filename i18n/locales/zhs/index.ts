@@ -1,6 +1,6 @@
 // import type { LocaleMessageValue } from 'vue-i18n';
 
-// import { GAMES } from '~~/shared';
+// import { GAMES } from '#shared';
 
 // const gameI18n = import.meta.glob<LocaleMessageValue>('./*/index.ts', { eager: true, import: 'default' });
 
