@@ -5,10 +5,10 @@
 </template>
 
 <script setup lang="ts">
-const { $orpc } = useNuxtApp();
 const i18n = useI18n();
 const title = useTitle();
 const { setActions } = useActions();
+const { randomAction } = useMagicActions();
 
 definePageMeta({
   layout: 'entry',
@@ -16,24 +16,7 @@ definePageMeta({
 
 title.value = i18n.t('magic.$self');
 
-setActions([
-  // {
-  //   id:      'edit',
-  //   icon:    'lucide:edit',
-  //   handler: () => {
-  //     console.log('编辑卡牌');
-  //   },
-  // },
-  {
-    id:      'random',
-    icon:    'tabler:arrows-shuffle',
-    handler: async () => {
-      const cardId = await $orpc.magic.card.random();
-
-      await navigateTo(`/magic/card/${cardId}`);
-    },
-  },
-]);
+setActions([randomAction]);
 
 </script>
 

@@ -5,6 +5,11 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools:          { enabled: true },
 
+  runtimeConfig: {
+    public: {
+      assetBaseUrl: process.env.ASSET_BASE_URL ?? 'https://asset.tcg.cards',
+    },
+  },
   nitro: {
     preset: 'cloudflare_module',
 
@@ -27,6 +32,13 @@ export default defineNuxtConfig({
   alias: {
     '#model':  fileURLToPath(new URL('./model', import.meta.url)),
     '#schema': fileURLToPath(new URL('./server/db/schema', import.meta.url)),
+  },
+
+  imports: {
+    dirs: [
+      'composables/**',
+      'components/**',
+    ],
   },
 
   css: ['~/assets/css/tailwind.css'],

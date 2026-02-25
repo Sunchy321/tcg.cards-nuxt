@@ -1,5 +1,3 @@
-import { useLocalStorage } from '@vueuse/core';
-
 import type { Game } from '~~/shared';
 
 import type { Locale as MagicLocale } from '~~/model/magic/schema/basic';
@@ -18,21 +16,22 @@ const schemas = {
   hearthstone: z.enum(['en']),
 } as const;
 
-export const useGameLocale = (game: Game) => {
-  const locale = useLocalStorage(`${game}_locale`, 'en');
+const resolveDefaultLocale = (
+  localeSchema: (typeof schemas)[Game],
+  currentLocale: string,
+) => {
+  return localeSchema.safeParse(currentLocale).data ?? localeSchema.options[0]!;
+};
 
+export const useGameLocale = (game: Game) => {
+  const i18n = useI18n();
   const localeSchema = schemas[game];
 
-  return computed({
-    get() {
-      return localeSchema.safeParse(locale.value).data ?? localeSchema.options[0]!;
-    },
-    set(newValue: Locale<Game>) {
-      const newLocale = localeSchema.safeParse(newValue);
-
-      if (newLocale.success) {
-        locale.value = newValue;
-      }
-    },
+  const locale = useCookie<Locale<Game>>(`${game}_locale`, {
+    default: () => resolveDefaultLocale(localeSchema, i18n.locale.value),
+    decode:  value => resolveDefaultLocale(localeSchema, value),
+    encode:  value => resolveDefaultLocale(localeSchema, value),
   });
+
+  return locale;
 };

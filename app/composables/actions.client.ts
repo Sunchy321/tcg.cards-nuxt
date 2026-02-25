@@ -4,24 +4,27 @@ export interface Action {
   handler: () => void;
 }
 
-const actionsMap = ref<Map<string, Action[]>>(new Map());
-
-const generateInstanceId = () => {
-  return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-};
+const actionsMap = ref<Map<object, Action[]>>(new Map());
+const ownerMap = new Map<object, number>();
 
 export const useActions = () => {
-  const currentInstanceId = generateInstanceId();
+  const instance = getCurrentInstance();
+  const componentType = instance?.type ?? {};
+  const instanceUid = instance?.uid ?? -1;
 
   const setActions = (newActions: Action[]) => {
     if (import.meta.client) {
-      actionsMap.value.set(currentInstanceId, newActions);
+      if (actionsMap.value.get(componentType) === newActions) return;
+      ownerMap.set(componentType, instanceUid);
+      actionsMap.value.set(componentType, newActions);
     }
   };
 
   const clearActions = () => {
     if (import.meta.client) {
-      actionsMap.value.delete(currentInstanceId);
+      if (ownerMap.get(componentType) !== instanceUid) return;
+      actionsMap.value.delete(componentType);
+      ownerMap.delete(componentType);
     }
   };
 
