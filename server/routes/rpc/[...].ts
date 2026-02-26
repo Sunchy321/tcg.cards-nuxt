@@ -1,12 +1,17 @@
 import { RPCHandler } from '@orpc/server/fetch';
 import { onError } from '@orpc/server';
+import { DrizzleQueryError } from 'drizzle-orm';
 
 import { router } from '~~/server/orpc/service';
 
 const handler = new RPCHandler(router, {
   interceptors: [
     onError(error => {
-      console.error(error);
+      console.error('[orpc] error:', error);
+
+      if (error instanceof DrizzleQueryError) {
+        console.error('[orpc] cause:', error.cause);
+      }
     }),
   ],
 });

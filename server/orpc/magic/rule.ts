@@ -12,7 +12,7 @@ import { rule,
   ruleSummary,
 } from '#model/magic/schema/rule';
 
-import { db } from '@nuxthub/db';
+import { db } from '#server/db/db';
 import { Rule, RuleItem } from '#schema/magic/rule';
 
 // import CardNameExtrator from '@/magic/extract-name';

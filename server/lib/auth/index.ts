@@ -2,7 +2,7 @@ import { betterAuth } from 'better-auth';
 import { admin, apiKey, openAPI, username } from 'better-auth/plugins';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 
-import { db } from '@nuxthub/db';
+import { db } from '#server/db/db';
 import { accounts, apikeys, sessions, users, verifications } from '~~/server/db/schema/auth';
 import { ac, roles } from './perms';
 

@@ -10,6 +10,7 @@ export default defineNuxtConfig({
       assetBaseUrl: process.env.ASSET_BASE_URL ?? 'https://asset.tcg.cards',
     },
   },
+
   nitro: {
     preset: 'cloudflare_module',
 
@@ -23,7 +24,6 @@ export default defineNuxtConfig({
     'nitro-cloudflare-dev',
     '@nuxt/eslint',
     '@nuxt/icon',
-    '@nuxthub/core',
     '@nuxtjs/i18n',
     '@vueuse/nuxt',
     '@nuxt/ui',
@@ -63,13 +63,6 @@ export default defineNuxtConfig({
     ],
   },
 
-  hub: {
-    db: {
-      dialect: 'postgresql',
-      driver:  'postgres-js',
-    },
-  },
-
   i18n: {
     defaultLocale: 'en',
     locales:       [
@@ -80,6 +73,13 @@ export default defineNuxtConfig({
     detectBrowserLanguage: {
       useCookie:  true,
       redirectOn: 'root',
+    },
+  },
+
+  fonts: {
+    providers: {
+      google:      false,
+      googleicons: false,
     },
   },
 });
