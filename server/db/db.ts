@@ -10,19 +10,24 @@ function getHyperdrive(): HyperdriveBinding {
     ?? (globalThis as any).HYPERDRIVE;
 
   if (binding == null) {
-    console.log(process.env);
-
     throw new Error('[db] HYPERDRIVE binding not found');
   }
 
   return binding;
 }
 
-function createDb() {
-  return drizzle({ connection: getHyperdrive().connectionString });
-}
+type Db = ReturnType<typeof drizzle>;
 
-type Db = ReturnType<typeof createDb>;
+let _db: Db | null = null;
+
+function createDb() {
+  if (process.env.NODE_ENV === 'development') {
+    _db ??= drizzle({ connection: getHyperdrive().connectionString });
+    return _db;
+  } else {
+    return drizzle({ connection: getHyperdrive().connectionString });
+  }
+}
 
 export const db: Db = new Proxy({} as Db, {
   get(_, prop: string | symbol) {

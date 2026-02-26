@@ -212,7 +212,8 @@ const { setActions } = useActions();
 const { randomAction } = useMagicActions();
 
 definePageMeta({
-  layout: 'main',
+  layout:  'main',
+  actions: [{ id: 'random', icon: 'tabler:arrows-shuffle' }],
 });
 
 setActions([randomAction]);
@@ -229,20 +230,19 @@ const query = computed(() => {
   return _.omitBy(q, v => v == null) as Parameters<typeof $orpc.magic.card.fuzzy>[0];
 });
 
-const asyncDataKey = computed(() => {
-  return [
-    'magic-card-fuzzy',
-    query.value.cardId,
-    query.value.locale,
-    query.value.set ?? '',
-    query.value.number ?? '',
-    query.value.partIndex ?? '',
-  ].join(':');
-});
+const asyncDataKey = () => [
+  'magic-card-fuzzy',
+  query.value.cardId,
+  query.value.locale,
+  query.value.set ?? '',
+  query.value.number ?? '',
+  query.value.partIndex ?? '',
+].join(':');
 
 const { data } = await useAsyncData(
   asyncDataKey,
   () => $orpc.magic.card.fuzzy(query.value),
+  { watch: [query] },
 );
 
 const getRarityColor = (rarity: string) => {

@@ -35,10 +35,11 @@
           v-for="action in actions"
           :key="action.id"
           :icon="action.icon"
+          :disabled="action.disabled"
           variant="ghost"
           size="xl"
           class="rounded-full size-10 text-white hover:bg-white/20 border border-white/20 flex items-center justify-center"
-          @click="action.handler"
+          @click="action.handler()"
         />
       </div>
     </div>

@@ -7,8 +7,12 @@ import type { Router } from '~~/server/orpc/service';
 export default defineNuxtPlugin(() => {
   const event = useRequestEvent();
 
+  const origin = import.meta.client
+    ? window.location.origin
+    : useRequestURL().origin;
+
   const link = new RPCLink({
-    url:     `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/rpc`,
+    url:     `${origin}/rpc`,
     headers: event?.headers,
   });
 

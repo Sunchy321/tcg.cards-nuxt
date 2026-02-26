@@ -11,7 +11,8 @@ const { setActions } = useActions();
 const { randomAction } = useMagicActions();
 
 definePageMeta({
-  layout: 'entry',
+  layout:  'entry',
+  actions: [{ id: 'random', icon: 'tabler:arrows-shuffle' }],
 });
 
 title.value = i18n.t('magic.$self');
