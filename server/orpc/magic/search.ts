@@ -5,7 +5,7 @@
 // import { locale } from '#model/magic/schema/basic';
 // import { devSearchResult, searchResult } from '#model/magic/schema/search';
 
-// import { searchInput } from '@search/schema';
+// import { searchInput } from '#search/schema';
 
 // import { search } from '../search';
 

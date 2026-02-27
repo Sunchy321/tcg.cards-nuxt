@@ -32,6 +32,7 @@ export default defineNuxtConfig({
   alias: {
     '#model':  fileURLToPath(new URL('./model', import.meta.url)),
     '#schema': fileURLToPath(new URL('./server/db/schema', import.meta.url)),
+    '#search': fileURLToPath(new URL('./search', import.meta.url)),
   },
 
   imports: {
