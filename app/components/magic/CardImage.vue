@@ -31,41 +31,45 @@
 
     <UButton
       v-if="rotatable"
-      class="control"
+      class="control rounded-full"
       color="neutral"
       variant="outline"
       icon="mdi:rotate-right"
       size="sm"
+      square
       @click.prevent.stop="realRotate = !realRotate"
     />
 
     <UButton
       v-if="turnable"
-      class="control"
+      class="control rounded-full"
       color="neutral"
       variant="outline"
       icon="mdi:rotate-3d-variant"
-      size="sm"
+      size="xl"
+      square
       @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
     />
 
     <UButton
       v-if="layout === 'flip'"
-      class="control"
+      class="control rounded-full"
       color="neutral"
       variant="outline"
       icon="mdi:autorenew"
-      size="sm"
+      size="xl"
+      square
       @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
     />
 
     <UButton
       v-if="layout === 'aftermath'"
-      class="control"
+      class="control rounded-full"
       color="neutral"
       variant="outline"
       icon="mdi:rotate-right"
-      size="sm"
+      size="xl"
+      square
       @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
     />
   </div>
