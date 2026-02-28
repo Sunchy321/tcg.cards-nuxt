@@ -171,7 +171,23 @@ export const date = cc
 
 export const format = cc
   .commands.format
-  .apply({ id: 'format', map: true });
+  .explain((args, i18n) => {
+    const { value, qualifier } = args;
+
+    if (typeof value === 'string' && value.includes('=')) {
+      const [fmt, status] = value.split('=');
+      const fmtText = i18n(`#.format.${fmt}`) ?? fmt;
+      const statusText = i18n(`#.legality.${status}`) ?? status;
+
+      if (!qualifier.includes('!')) {
+        return i18n('$.full-command.format-with-status', { format: fmtText, status: statusText });
+      } else {
+        return i18n('$.full-command.format-with-status-not', { format: fmtText, status: statusText });
+      }
+    }
+
+    return builtin.simple.call({ args: args as any, meta: { id: 'format', map: true }, i18n });
+  });
 
 export const counter = cc
   .commands.counter

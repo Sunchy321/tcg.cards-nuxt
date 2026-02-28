@@ -1,12 +1,14 @@
 export default {
   'full-command': {
-    'raw':              '名称包含{value}',
-    'raw-mana':         '法术力费用或描述包含{value}',
-    'stats':            '力量是{power}并且防御力是{toughness}',
-    'hash':             '具有标签 {tag}',
-    'order':            '按{value}排序',
-    'order-ascending':  '按{value}排序（升序）',
-    'order-descending': '按{value}排序（降序）',
+    'raw':                    '名称包含{value}',
+    'raw-mana':               '法术力费用或描述包含{value}',
+    'stats':                  '力量是{power}并且防御力是{toughness}',
+    'hash':                   '具有标签 {tag}',
+    'order':                  '按{value}排序',
+    'order-ascending':        '按{value}排序（升序）',
+    'order-descending':       '按{value}排序（降序）',
+    'format-with-status':     '在{format}模式中{status}',
+    'format-with-status-not': '在{format}模式中{status}',
   },
 
   'command': {
@@ -49,6 +51,13 @@ export default {
   },
 
   'parameter': {
+    'format-status': {
+      legal:      '合法',
+      restricted: '限制',
+      not_legal:  '不合法',
+      banned:     '禁止',
+    },
+
     'layout': {
       transform: '转化式双面牌',
       battle:    '战役',

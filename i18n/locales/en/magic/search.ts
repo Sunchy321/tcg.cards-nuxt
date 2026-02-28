@@ -1,12 +1,14 @@
 export default {
   'full-command': {
-    'raw':              'name includes {value}',
-    'raw-mana':         'mana cost or text includes {value}',
-    'stats':            'power is {power} and toughness is {toughness}',
-    'hash':             'has tag {tag}',
-    'order':            'order by {value}',
-    'order-ascending':  'order by {value} (ascending)',
-    'order-descending': 'order by {value} (descending)',
+    'raw':                    'name includes {value}',
+    'raw-mana':               'mana cost or text includes {value}',
+    'stats':                  'power is {power} and toughness is {toughness}',
+    'hash':                   'has tag {tag}',
+    'order':                  'order by {value}',
+    'order-ascending':        'order by {value} (ascending)',
+    'order-descending':       'order by {value} (descending)',
+    'format-with-status':     'legality is {status} in {format}',
+    'format-with-status-not': 'legality isn\'t {status} in {format}',
   },
 
   'command': {
@@ -49,6 +51,13 @@ export default {
   },
 
   'parameter': {
+    'format-status': {
+      legal:      'legal',
+      restricted: 'restricted',
+      not_legal:  'not legal',
+      banned:     'banned',
+    },
+
     'layout': {
       transform: 'Transforming DFC',
       battle:    'Battle',

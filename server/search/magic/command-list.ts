@@ -446,7 +446,7 @@ export const date = cs
 export const format = cs
   .commands.format
   .handler(({ value, qualifier }, { table }) => {
-    if (value.includes(',')) {
+    if (value.includes('=')) {
       const [format, status] = value.split('=');
 
       if (!qualifier.includes('!')) {
@@ -543,31 +543,31 @@ export const order = cs
         // Sort by color: colorless non-land non-artifact -> WUBRG monocolor -> multicolor -> artifact -> land
         // Count the number of '1' bits in the color field to determine color count
         sorter.push(func(sql`(
-                    CASE
-                        -- Land (priority 5)
-                        WHEN 'Land' = ANY(${table.cardPart.typeMain}) THEN 5
-                        -- Artifact (priority 4)
-                        WHEN 'Artifact' = ANY(${table.cardPart.typeMain}) THEN 4
-                        -- Multicolor (priority 3): more than one '1' bit
-                        WHEN length(replace(${table.cardPart.color}::text, '0', '')) > 1 THEN 3
-                        -- Monocolor (priority 2): exactly one '1' bit
-                        WHEN length(replace(${table.cardPart.color}::text, '0', '')) = 1 THEN 2
-                        -- Colorless non-land non-artifact (priority 1)
-                        ELSE 1
-                    END
-                )`));
+          CASE
+            -- Land (priority 5)
+            WHEN 'Land' = ANY(${table.cardPart.typeMain}) THEN 5
+            -- Artifact (priority 4)
+            WHEN 'Artifact' = ANY(${table.cardPart.typeMain}) THEN 4
+            -- Multicolor (priority 3): more than one '1' bit
+            WHEN length(replace(${table.cardPart.color}::text, '0', '')) > 1 THEN 3
+            -- Monocolor (priority 2): exactly one '1' bit
+            WHEN length(replace(${table.cardPart.color}::text, '0', '')) = 1 THEN 2
+            -- Colorless non-land non-artifact (priority 1)
+            ELSE 1
+          END
+        )`));
         // For monocolor cards, sort by WUBRG order
         // W=bit 0, U=bit 1, B=bit 2, R=bit 3, G=bit 4
         sorter.push(func(sql`(
-                    CASE
-                        WHEN substring(${table.cardPart.color}::text, 1, 1) = '1' THEN 1  -- W
-                        WHEN substring(${table.cardPart.color}::text, 2, 1) = '1' THEN 2  -- U
-                        WHEN substring(${table.cardPart.color}::text, 3, 1) = '1' THEN 3  -- B
-                        WHEN substring(${table.cardPart.color}::text, 4, 1) = '1' THEN 4  -- R
-                        WHEN substring(${table.cardPart.color}::text, 5, 1) = '1' THEN 5  -- G
-                        ELSE 6
-                    END
-                )`));
+          CASE
+            WHEN substring(${table.cardPart.color}::text, 1, 1) = '1' THEN 1  -- W
+            WHEN substring(${table.cardPart.color}::text, 2, 1) = '1' THEN 2  -- U
+            WHEN substring(${table.cardPart.color}::text, 3, 1) = '1' THEN 3  -- B
+            WHEN substring(${table.cardPart.color}::text, 4, 1) = '1' THEN 4  -- R
+            WHEN substring(${table.cardPart.color}::text, 5, 1) = '1' THEN 5  -- G
+            ELSE 6
+          END
+        )`));
         break;
       default:
         throw new QueryError({ type: 'invalid-query' });

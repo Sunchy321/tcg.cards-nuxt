@@ -94,7 +94,9 @@ const pageSize = computed(() => {
 const explained = computed(() => model.explain(q.value ?? '', (key: string, named?: Record<string, any>) => {
   let realKey: string;
 
-  if (key.startsWith('$.')) {
+  if (key.startsWith('#.')) {
+    realKey = `magic.${key.slice(2)}`;
+  } else if (key.startsWith('$.')) {
     realKey = `magic.search.${key.slice(2)}`;
   } else {
     realKey = `search.${key}`;
