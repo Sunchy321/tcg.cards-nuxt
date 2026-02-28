@@ -7,6 +7,7 @@ export default {
     'order':                  'order by {value}',
     'order-ascending':        'order by {value} (ascending)',
     'order-descending':       'order by {value} (descending)',
+    'format-available':       'available in {format}',
     'format-with-status':     'legality is {status} in {format}',
     'format-with-status-not': 'legality isn\'t {status} in {format}',
   },

@@ -7,6 +7,7 @@ export default {
     'order':                  '按{value}排序',
     'order-ascending':        '按{value}排序（升序）',
     'order-descending':       '按{value}排序（降序）',
+    'format-available':       '在{format}模式中可用',
     'format-with-status':     '在{format}模式中{status}',
     'format-with-status-not': '在{format}模式中{status}',
   },

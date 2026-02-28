@@ -130,19 +130,19 @@ export const flavorName = cc
 
 export const layout = cc
   .commands.layout
-  .apply({ id: 'layout', map: true });
+  .apply({ id: 'layout', mapValue: true });
 
 export const imageStatus = cc
   .commands.imageStatus
-  .apply({ id: 'image-status', map: true });
+  .apply({ id: 'image-status', mapValue: true });
 
 export const imageType = cc
   .commands.imageType
-  .apply({ id: 'image-type', map: true });
+  .apply({ id: 'image-type', mapValue: true });
 
 export const rarity = cc
   .commands.rarity
-  .apply({ id: 'rarity', map: true });
+  .apply({ id: 'rarity', mapValue: true });
 
 export const date = cc
   .commands.date
@@ -184,9 +184,11 @@ export const format = cc
       } else {
         return i18n('$.full-command.format-with-status-not', { format: fmtText, status: statusText });
       }
-    }
+    } else {
+      const fmtText = i18n(`#.format.${value}`) ?? value;
 
-    return builtin.simple.call({ args: args as any, meta: { id: 'format', map: true }, i18n });
+      return i18n('$.full-command.format-available', { format: fmtText });
+    }
   });
 
 export const counter = cc
