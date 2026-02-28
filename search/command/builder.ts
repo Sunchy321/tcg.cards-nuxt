@@ -5,7 +5,7 @@ import type { Merge } from '#search/util/merge';
 import { merge } from '#search/util/merge';
 import type { CommandInputOption, CommandOption, Operator, Qualifier } from './types';
 
-import { castArray, omit, uniq } from 'lodash';
+import _ from 'lodash';
 
 export class CommandBuilder<
   Type extends string,
@@ -68,19 +68,19 @@ export class CommandBuilder<
   alt(alt: string | string[]) {
     return new CommandBuilder<Type, Input, MetaInput, MetaValue>({
       ...this.options,
-      alternatives: uniq([...this.options.alternatives ?? [], ...castArray(alt)]),
+      alternatives: _.uniq([...this.options.alternatives ?? [], ..._.castArray(alt)]),
     });
   }
 
   op<Op extends Operator>(operators: Op[]) {
-    return new CommandBuilder<Type, Merge<Input, { operators: Op[] }>, MetaInput, MetaValue>(omit({
+    return new CommandBuilder<Type, Merge<Input, { operators: Op[] }>, MetaInput, MetaValue>(_.omit({
       ...this.options,
       input: merge(this.options.input, { operators }),
     }, 'type'));
   }
 
   qual<Qual extends Qualifier>(qualifiers: Qual[]) {
-    return new CommandBuilder<Type, Merge<Input, { qualifiers: Qual[] }>, MetaInput, MetaValue>(omit({
+    return new CommandBuilder<Type, Merge<Input, { qualifiers: Qual[] }>, MetaInput, MetaValue>(_.omit({
       ...this.options,
       input: merge(this.options.input, { qualifiers }),
     }, 'type'));
@@ -97,7 +97,7 @@ export class CommandBuilder<
     return new CommandBuilder<Type, Merge<Input, { operators: (Input['operators'][0] | '')[], pattern: P, alwaysMatch: AM }>, MetaInput, MetaValue>({
       ...this.options,
       input: merge(this.options.input, {
-        operators:   uniq([...this.options.input.operators, '']),
+        operators:   _.uniq([...this.options.input.operators, '']),
         pattern,
         alwaysMatch: alwaysMatch ?? false as AM,
       }),

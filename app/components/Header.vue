@@ -1,12 +1,20 @@
 <template>
-  <header class="fixed top-0 left-0 w-full bg-white/10 backdrop-blur-md border-b border-white/20 z-50">
+  <header class="fixed top-0 left-0 w-full bg-white/10 backdrop-blur-md border-b border-white/20 z-50 flex flex-col">
     <div class="container mx-auto px-6 py-4 flex items-center gap-4">
       <NuxtLink :to="homeLink" class="flex items-center hover:opacity-80 transition-opacity">
         <Icon :name="logo" :size="32" class="text-white" />
-        <span class="ml-3 font-semibold text-white text-lg">{{ title }}</span>
       </NuxtLink>
 
-      <div class="flex-1" />
+      <template v-if="route.meta.titleType === 'input'">
+        <UInput
+          v-model="searchInput"
+          class="ml-3 flex-1"
+          size="xl"
+          :ui="{ base: 'font-semibold text-white bg-transparent border-white/60 focus:border-white w-full' }"
+          @keydown.enter="commitSearch"
+        />
+      </template>
+      <span v-else class="ml-3 font-semibold text-white text-lg flex-1">{{ title }}</span>
 
       <USelect
         v-if="currentGame != null && localeOptions.length > 1"
@@ -43,6 +51,8 @@
         />
       </div>
     </div>
+    <!-- Subheader portal: pages Teleport content here -->
+    <div id="subheader-portal" />
   </header>
 </template>
 
@@ -52,8 +62,22 @@ import type { Game } from '#shared';
 import { mainLocale as magicLocaleSchema } from '#model/magic/schema/basic';
 
 const route = useRoute();
+const router = useRouter();
 const { t } = useI18n();
+const game = useGame();
 const title = useTitle();
+
+const searchInput = useSearchInput();
+
+const commitSearch = () => {
+  if (game.value != null) {
+    router.push({
+      path:  `/${game.value}/search`,
+      query: { q: searchInput.value },
+    });
+  }
+};
+
 const { getActions } = useActions();
 
 const actions = getActions();

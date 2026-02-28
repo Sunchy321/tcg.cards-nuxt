@@ -40,6 +40,45 @@ export default {
     'zhs:md':  '简体中文（MD）',
   },
 
+  search: {
+    error: {
+      'unknown-token':   '未知符号',
+      'unknown-command': '未知命令{name}',
+    },
+
+    separator: {
+      '&': '且',
+      '|': '或',
+    },
+
+    operator: {
+      'match':            '匹配',
+      'not-match':        '不匹配',
+      'equal':            '等于',
+      'not-equal':        '不等于',
+      'less-than':        '小于',
+      'less-or-equal':    '等于或小于',
+      'greater-than':     '大于',
+      'greater-or-equal': '等于或大于',
+
+      'include':     '包含',
+      'not-include': '不包含',
+      'is':          '是',
+      'is-not':      '不是',
+
+      'count-is':               '数量是',
+      'count-is-not':           '数量不是',
+      'count-greater-than':     '数量大于',
+      'count-greater-or-equal': '数量等于或大于',
+      'count-less-than':        '数量小于',
+      'count-less-or-equal':    '数量等于或小于',
+    },
+
+    qualifier: {
+      '!': '并非',
+    },
+  },
+
   // omnisearch: gameI18n['./omnisearch/index.ts'],
 
   // ...Object.fromEntries(GAMES.map(g => [g, gameI18n[`./${g}/index.ts`]])),

@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+html {
+  scrollbar-gutter: stable;
+}
+
 /* ── Magic: The Gathering fonts ──────────────────────────────────────────── */
 
 @font-face {

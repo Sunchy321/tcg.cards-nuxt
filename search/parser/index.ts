@@ -1,8 +1,9 @@
-import { last } from 'lodash';
 import SearchError from './error';
 import type { Token } from './lexer';
 import Lexer, { defaultOption } from './lexer';
 import type { Operator, Qualifier } from '../command';
+
+import _ from 'lodash';
 
 export type ParserError = {
   type:     string;
@@ -98,7 +99,7 @@ export default class Parser {
   }
 
   private undo() {
-    const lastToken = last(this.tokens);
+    const lastToken = _.last(this.tokens);
 
     if (lastToken != null) {
       this.index = lastToken.location[0];
@@ -244,7 +245,7 @@ export default class Parser {
         sep:      sep as any,
         exprs,
         tokens:   this.returnTokens(),
-        location: [exprs[0]!.location[0], last(exprs)!.location[1]],
+        location: [exprs[0]!.location[0], _.last(exprs)!.location[1]],
       };
     }
   }
@@ -362,7 +363,7 @@ export default class Parser {
           type:     'slash',
           args:     args.map(a => a.text),
           tokens:   this.returnTokens(),
-          location: [first.location[0], last(args)!.location[1]],
+          location: [first.location[0], _.last(args)!.location[1]],
         };
       }
 

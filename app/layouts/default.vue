@@ -2,7 +2,7 @@
   <div class="min-h-screen flex flex-col bg-linear-to-br">
     <Header />
 
-    <main class="flex-1 flex items-center justify-center px-4 py-8">
+    <main class="flex-1 flex items-center justify-center px-4 py-8 pt-18">
       <slot />
     </main>
 

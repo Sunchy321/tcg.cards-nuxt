@@ -35,6 +35,9 @@ const slots = defineSlots<{
   default: () => any[];
 }>();
 
+defineOptions({ inheritAttrs: false });
+const attrs = useAttrs();
+
 const gameLocale = useGameLocale('magic');
 const lang = computed(() => props.lang ?? gameLocale.value);
 
@@ -266,7 +269,9 @@ const render = () => {
     ? md.parseInline(text, {})
     : md.parse(text, {});
 
-  return tokensToVNodes(tokens);
+  const vnodes = tokensToVNodes(tokens);
+  const tag = props.inline ? 'span' : 'div';
+  return h(tag, attrs, vnodes);
 };
 
 // expose lang so consumers can reference it (e.g. for [lang] attr on parent)

@@ -1,11 +1,15 @@
-import type { Game } from '~~/shared';
+import { type Game, GAMES } from '~~/shared';
 
 export const useGame = () => {
   const route = useRoute();
 
-  const currentGame = computed<Game | null>(() => {
-    return route.meta.game ?? null;
-  });
+  return computed<Game | null>(() => {
+    const gamePath = route.path.split('/')[1];
 
-  return currentGame;
+    if (GAMES.includes(gamePath as Game)) {
+      return gamePath as Game;
+    } else {
+      return null;
+    }
+  });
 };

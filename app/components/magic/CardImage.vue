@@ -29,49 +29,53 @@
       {{ imageStatus }}
     </div>
 
-    <UButton
-      v-if="rotatable"
-      class="control rounded-full"
-      color="neutral"
-      variant="outline"
-      icon="mdi:rotate-right"
-      size="sm"
-      square
-      @click.prevent.stop="realRotate = !realRotate"
-    />
+    <div v-if="rotatable" class="control">
+      <UButton
+        class="rounded-full"
+        color="neutral"
+        variant="outline"
+        icon="mdi:rotate-right"
+        size="sm"
+        square
+        @click.prevent.stop="realRotate = !realRotate"
+      />
+    </div>
 
-    <UButton
-      v-if="turnable"
-      class="control rounded-full"
-      color="neutral"
-      variant="outline"
-      icon="mdi:rotate-3d-variant"
-      size="xl"
-      square
-      @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
-    />
+    <div v-if="turnable" class="control">
+      <UButton
+        class="rounded-full"
+        color="neutral"
+        variant="outline"
+        icon="mdi:rotate-3d-variant"
+        size="xl"
+        square
+        @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
+      />
+    </div>
 
-    <UButton
-      v-if="layout === 'flip'"
-      class="control rounded-full"
-      color="neutral"
-      variant="outline"
-      icon="mdi:autorenew"
-      size="xl"
-      square
-      @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
-    />
+    <div v-if="layout === 'flip'" class="control">
+      <UButton
+        class="rounded-full"
+        color="neutral"
+        variant="outline"
+        icon="mdi:autorenew"
+        size="xl"
+        square
+        @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
+      />
+    </div>
 
-    <UButton
-      v-if="layout === 'aftermath'"
-      class="control rounded-full"
-      color="neutral"
-      variant="outline"
-      icon="mdi:rotate-right"
-      size="xl"
-      square
-      @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
-    />
+    <div v-if="layout === 'aftermath'" class="control">
+      <UButton
+        class="rounded-full"
+        color="neutral"
+        variant="outline"
+        icon="mdi:rotate-right"
+        size="xl"
+        square
+        @click.prevent.stop="realPart = realPart === 1 ? 0 : 1"
+      />
+    </div>
   </div>
 </template>
 
@@ -195,76 +199,76 @@ watch(() => props.rotate, () => {
 
 <style lang="scss" scoped>
 .card-image {
-    position: relative;
-    padding-bottom: calc(100% / (745/1040));
-    perspective: 1000px;
+  position: relative;
+  aspect-ratio: 745 / 1040;
+  perspective: 1000px;
 }
 
 .image {
-    position: absolute;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    right: 0;
-    transition: transform 0.5s;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  transition: transform 0.5s;
 
-    &.rotated {
-        transform: rotate(90deg) scale(calc(745/1040));
+  &.rotated {
+    transform: rotate(90deg) scale(calc(745/1040));
+  }
+
+  &.layout-flip.part-1,
+  &.layout-flip_token_bottom {
+    transform: rotate(180deg);
+  }
+
+  &.layout-aftermath.part-1 {
+    transform: rotate(-90deg) scale(calc(745/1040));
+  }
+
+  &.turnable {
+    transform-style: preserve-3d;
+
+    .front, .back {
+      position: absolute;
+      top: 0;
+      left: 0;
+      backface-visibility: hidden;
     }
 
-    &.layout-flip.part-1,
-    &.layout-flip_token_bottom {
-        transform: rotate(180deg);
+    .front {
+      transform: rotateY(0deg);
     }
 
-    &.layout-aftermath.part-1 {
-        transform: rotate(-90deg) scale(calc(745/1040));
+    .back {
+      transform: rotateY(180deg);
     }
 
-    &.turnable {
-        transform-style: preserve-3d;
-
-        .front, .back {
-            position: absolute;
-            top: 0;
-            left: 0;
-            backface-visibility: hidden;
-        }
-
-        .front {
-            transform: rotateY(0deg);
-        }
-
-        .back {
-            transform: rotateY(180deg);
-        }
-
-        &.part-1 {
-            transform: rotateY(-180deg);
-        }
+    &.part-1 {
+      transform: rotateY(-180deg);
     }
+  }
 }
 
 .status-badge {
-    position: absolute;
-    top: 12%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.6);
-    color: #fff;
-    font-size: 0.65rem;
-    font-family: monospace;
-    padding: 2px 6px;
-    border-radius: 4px;
-    pointer-events: none;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+  position: absolute;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 0.65rem;
+  font-family: monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .control {
-    position: absolute;
-    top: 50%;
-    right: 5%;
-    transform: translateY(-50%);
+  position: absolute;
+  top: 50%;
+  right: 5%;
+  transform: translateY(-50%);
 }
 </style>

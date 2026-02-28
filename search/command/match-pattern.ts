@@ -1,11 +1,11 @@
-import { escapeRegExp } from 'lodash';
+import _ from 'lodash';
 
 export function matchPattern(pattern: string, parameter: string): Record<string, string> | undefined {
   const regexText = pattern.split(/(\{\{[A-Za-z_]+?\}\})/).map(t => {
     if (t.startsWith('{{') && t.endsWith('}}')) {
       return `(?<${t.slice(2, -2)}>.*?)`;
     } else {
-      return escapeRegExp(t);
+      return _.escapeRegExp(t);
     }
   }).join('');
 

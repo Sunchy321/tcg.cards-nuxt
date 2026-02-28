@@ -1,3 +1,5 @@
+import search from './search';
+
 export default {
   $self: '万智牌',
   $full: '万智牌',
@@ -68,4 +70,6 @@ export default {
     'story-spotlight': '故事焦点',
     'textless':        '无文字',
   },
+
+  search,
 };

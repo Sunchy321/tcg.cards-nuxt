@@ -350,8 +350,9 @@ const { setActions } = useActions();
 const { randomAction } = useMagicActions();
 
 definePageMeta({
-  layout:  'main',
-  actions: [{ id: 'random', icon: 'tabler:arrows-shuffle' }],
+  layout:    'main',
+  titleType: 'input',
+  actions:   [{ id: 'random', icon: 'tabler:arrows-shuffle' }],
 });
 
 setActions([randomAction]);

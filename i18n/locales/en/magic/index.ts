@@ -1,3 +1,5 @@
+import search from './search';
+
 export default {
   $self: 'Magic',
   $full: 'Magic: The Gathering',
@@ -76,4 +78,6 @@ export default {
     'story-spotlight': 'Story Spotlight',
     'textless':        'Textless',
   },
+
+  search,
 };

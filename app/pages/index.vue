@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col items-center justify-center h-full py-8 gap-6">
+  <div class="flex flex-col items-center justify-center h-full gap-6">
     <UFieldGroup class="w-[90%] md:w-[75%] mt-50 text-black bg-white rounded-md shadow-[0_20px_60px_rgba(0,0,0,0.3)] overflow-hidden" size="xl">
       <USelect v-model="game" :items="gameOptions" :ui="{ content: 'min-w-fit' }">
         <template #item="{ item }">
