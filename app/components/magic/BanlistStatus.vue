@@ -47,14 +47,38 @@ const SHORT_LABEL: Record<string, string> = {
   banned_as_companion: 'banned',
 };
 
-const icon = computed(() => ICON[props.status] ?? 'mdi:help-circle-outline');
-const color = computed(() => COLOR[props.status] ?? 'text-gray-700');
-const fullLabel = computed(() => te(`magic.legality.${props.status}`) ? t(`magic.legality.${props.status}`) : props.status.replace(/_/g, ' '));
+const isScore = computed(() => /^score-\d+$/.test(props.status));
+const scoreValue = computed(() => isScore.value ? parseInt(props.status.slice(6)) : null);
+
+const icon = computed(() => {
+  if (isScore.value) return 'mdi:counter';
+  return ICON[props.status] ?? 'mdi:help-circle-outline';
+});
+
+const color = computed(() => {
+  if (isScore.value) return 'text-purple-600';
+  return COLOR[props.status] ?? 'text-gray-700';
+});
+
+const fullLabel = computed(() => {
+  if (isScore.value) {
+    return te('magic.legality.score') ? t('magic.legality.score', { n: scoreValue.value }) : `Score ${scoreValue.value}`;
+  }
+
+  return te(`magic.legality.${props.status}`) ? t(`magic.legality.${props.status}`) : props.status.replace(/_/g, ' ');
+});
+
 const shortLabel = computed(() => {
+  if (isScore.value) {
+    return te('magic.legality.score') ? t('magic.legality.score', { n: scoreValue.value }) : `Score ${scoreValue.value}`;
+  }
+
   if (props.status in SHORT_LABEL) {
     return te('magic.legality.banned') ? t('magic.legality.banned') : 'banned';
   }
+
   return fullLabel.value;
 });
+
 const tooltip = computed(() => shortLabel.value !== fullLabel.value ? fullLabel.value : '');
 </script>

@@ -69,6 +69,7 @@ export default {
     banned_as_commander: 'Banned as Commander',
     banned_as_companion: 'Banned as Companion',
     game_changer:        'Game Changer',
+    score:               'Score {n}',
   },
 
   tag: {

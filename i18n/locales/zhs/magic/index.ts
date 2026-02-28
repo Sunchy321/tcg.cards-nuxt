@@ -61,6 +61,7 @@ export default {
     banned_as_commander: '禁止用作指挥官',
     banned_as_companion: '禁止用作行侣',
     game_changer:        '主宰牌',
+    score:               '{n}分',
   },
 
   tag: {
