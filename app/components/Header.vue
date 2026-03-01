@@ -16,6 +16,27 @@
       </template>
       <span v-else class="ml-3 font-semibold text-white text-lg flex-1">{{ title }}</span>
 
+      <template v-for="p in params" :key="p.id">
+        <USelect
+          v-if="p.type === 'select'"
+          :model-value="p.value"
+          :items="p.items"
+          size="xl"
+          class="w-40"
+          trailing-icon=""
+          :ui="{ base: 'text-white bg-white/10 hover:bg-white/20 border-white/20 ring-white/20', content: 'min-w-fit' }"
+          @update:model-value="p.onChange"
+        />
+        <UButton
+          v-else-if="p.type === 'switch'"
+          :icon="p.icon"
+          :variant="p.value ? 'solid' : 'ghost'"
+          size="xl"
+          class="rounded-full size-10 text-white hover:bg-white/20 border border-white/20 flex items-center justify-center"
+          @click="p.onChange(!p.value)"
+        />
+      </template>
+
       <USelect
         v-if="currentGame != null && localeOptions.length > 1"
         v-model="gameLocale"
@@ -60,6 +81,7 @@
 import type { Game } from '#shared';
 
 import { mainLocale as magicLocaleSchema } from '#model/magic/schema/basic';
+import { useParams } from '~/composables/params';
 
 const route = useRoute();
 const router = useRouter();
@@ -81,6 +103,12 @@ const commitSearch = () => {
 const { getActions } = useActions();
 
 const actions = getActions();
+
+// ── Generic params ────────────────────────────────────────────────────────────
+
+const { getParams } = useParams();
+
+const params = getParams();
 
 const magicLocale = useGameLocale('magic');
 const hearthstoneLocale = useGameLocale('hearthstone');

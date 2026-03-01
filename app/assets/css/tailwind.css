@@ -5,6 +5,14 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Reka UI adds padding-right to body when a modal opens to compensate for
+   the scrollbar disappearing. Since we use scrollbar-gutter: stable, the
+   scrollbar slot is always reserved and no extra padding is needed. */
+body {
+  padding-right: 0 !important;
+  margin-right: 0 !important;
+}
+
 /* ── Magic: The Gathering fonts ──────────────────────────────────────────── */
 
 @font-face {

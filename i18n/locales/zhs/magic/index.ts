@@ -72,5 +72,22 @@ export default {
     'textless':        '无文字',
   },
 
+  ui: {
+    format: {
+      banlist:  '禁限表',
+      set:      '系列',
+      no_data:  '无数据',
+      save_svg: '保存 SVG',
+
+      group: {
+        ante:       '赌注牌',
+        legendary:  '传奇',
+        conspiracy: '诡局',
+        unfinity:   '鸡飞牌',
+        offensive:  '冒犯性牌',
+      },
+    },
+  },
+
   search,
 };

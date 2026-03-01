@@ -80,5 +80,22 @@ export default {
     'textless':        'Textless',
   },
 
+  ui: {
+    format: {
+      banlist:  'Banlist',
+      set:      'Sets',
+      no_data:  'No data',
+      save_svg: 'Save SVG',
+
+      group: {
+        ante:       'Ante',
+        legendary:  'Legendary',
+        conspiracy: 'Conspiracy',
+        unfinity:   'Unfinity',
+        offensive:  'Offensive',
+      },
+    },
+  },
+
   search,
 };

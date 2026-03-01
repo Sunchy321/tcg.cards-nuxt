@@ -4,23 +4,26 @@
     v-bind="onThisPage ? {} : linkProps"
     class="magic-card-avatar"
   >
-    <UTooltip
+    <UPopover
       v-if="!onThisPage && imageVersion"
-      :delay-duration="300"
+      v-model:open="isOpen"
+      :content="{ side: 'top', align: 'start' }"
     >
-      <span :lang="lang">{{ displayText }}</span>
+      <span :lang="lang" @mouseenter="onMouseEnter" @mouseleave="onMouseLeave">{{ displayText }}</span>
       <template #content>
-        <MagicCardImage
-          class="card-avatar-popover-image"
-          :lang="imageVersion.lang"
-          :set="imageVersion.set"
-          :number="imageVersion.number"
-          :layout="imageVersion.layout"
-          :full-image-type="imageVersion.fullImageType"
-          :part="part"
-        />
+        <div @mouseenter="onMouseEnter" @mouseleave="onMouseLeave">
+          <MagicCardImage
+            class="card-avatar-popover-image"
+            :lang="imageVersion.lang"
+            :set="imageVersion.set"
+            :number="imageVersion.number"
+            :layout="imageVersion.layout"
+            :full-image-type="imageVersion.fullImageType"
+            :part="part"
+          />
+        </div>
       </template>
-    </UTooltip>
+    </UPopover>
     <span v-else :lang="lang">{{ displayText }}</span>
   </component>
 </template>
@@ -140,6 +143,25 @@ const linkProps = computed(() => ({
   to:     linkHref.value,
   target: '_blank',
 }));
+
+// ── Hover popover ────────────────────────────────────────────────────────────
+
+const isOpen = ref(false);
+let closeTimer: ReturnType<typeof setTimeout> | null = null;
+
+const onMouseEnter = () => {
+  if (closeTimer) {
+    clearTimeout(closeTimer);
+    closeTimer = null;
+  }
+  isOpen.value = true;
+};
+
+const onMouseLeave = () => {
+  closeTimer = setTimeout(() => {
+    isOpen.value = false;
+  }, 120);
+};
 </script>
 
 <style>
