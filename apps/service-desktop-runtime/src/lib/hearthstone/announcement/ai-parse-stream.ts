@@ -1,78 +1,118 @@
-import { ORPCError, os } from '@orpc/server';
 import { z } from 'zod';
-import { generateText, isStepCount, tool } from 'ai';
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  isStepCount,
+  streamText,
+  toUIMessageStream,
+  tool,
+} from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 
 import { Patch } from '@tcg-cards/db/schema/local/hearthstone';
 import { locale } from '@tcg-cards/model/hearthstone/schema/basic';
 import { glowEntry, glowPart, group as groupEnum } from '@tcg-cards/model/hearthstone/schema/announcement';
-import { renderModel } from '@tcg-cards/model/hearthstone/schema/entity';
 
-import { getLocalDb } from '../../../lib/hearthstone/hsdata-local-db';
-import { searchCardCandidates } from '../../../lib/hearthstone/card-search';
-import { extractJsonObject, matchPatches, normalizeAiResult, type AiItem } from '../../../lib/hearthstone/announcement/ai';
-import { hasAiConfig, readAiConfig } from '../../../runtime-config';
+import { getLocalDb, type LocalDb } from '../hsdata-local-db';
+import { searchCardCandidates } from '../card-search';
+import { extractJsonObject, matchPatches, normalizeAiResult, type AiItem } from './ai';
+import { readAiConfig } from '../../../runtime-config';
 
-const itemDelta = z.object({
-  prev: renderModel.partial().optional(),
-  curr: renderModel.partial().optional(),
-}).nullable();
+export interface AiParseStreamInput {
+  name?: string;
+  links: Array<{ url: string, label?: string }>;
+}
 
-const item = z.object({
-  type:         z.string(),
-  format:       z.string().nullable(),
-  status:       z.string().nullable(),
-  cardId:       z.string().nullable(),
-  setId:        z.string().nullable(),
-  ruleId:       z.string().nullable(),
-  delta:        itemDelta,
-  glow:         glowEntry.array().nullable(),
-  relatedCards: z.string().array(),
-  group:        z.string().nullable(),
-  score:        z.number().nullable(),
-});
+/**
+ * Builds an SSE response that streams the announcement AI parse to the client.
+ * Emits the AI SDK UI message stream (text + tool calls) plus custom
+ * `data-phase` / `data-result` events consumed by the announcement editor.
+ */
+export function buildAiParseStreamResponse(input: AiParseStreamInput, abortSignal?: AbortSignal): Response {
+  const config = readAiConfig();
 
-const header = z.object({
-  name:          z.string().nullable(),
-  date:          z.string().nullable(),
-  effectiveDate: z.string().nullable(),
-  version:       z.number().nullable(),
-});
+  const provider = createOpenAICompatible({
+    name:    'announcement-ai',
+    baseURL: config.baseUrl ?? 'https://api.openai.com/v1',
+    apiKey:  config.apiKey!,
+  });
 
-export const aiParse = os
-  .route({
-    method:      'POST',
-    description: 'Parse announcement text with AI to extract header fields and items',
-    tags:        ['Desktop', 'Hearthstone', 'Announcement'],
-  })
-  .input(z.object({
-    name:  z.string().optional(),
-    links: z.array(z.object({ url: z.string(), label: z.string().optional() })),
-  }))
-  .output(z.object({ header, items: item.array() }))
-  .handler(async ({ input }) => {
-    if (!hasAiConfig()) {
-      throw new ORPCError('PRECONDITION_FAILED', { message: 'AI config not set. Please configure API key in settings.' });
-    }
+  const model = provider(config.model || 'gpt-4o-mini');
 
-    const config = readAiConfig();
+  const startedAt = performance.now();
 
-    const provider = createOpenAICompatible({
-      name:    'announcement-ai',
-      baseURL: config.baseUrl ?? 'https://api.openai.com/v1',
-      apiKey:  config.apiKey!,
-    });
+  // Populated right before parsing so the error event can include the raw output.
+  let rawText = '';
+  let rawReason = '';
 
-    const model = provider(config.model || 'gpt-4o-mini');
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      const emitPhase = (phase: string) => writer.write({ type: 'data-phase', data: { phase } });
 
-    const startedAt = performance.now();
-    const linkTexts = await fetchLinkContents(input.links.map(l => l.url));
-    console.log(`[announcement ai-parse] fetched ${input.links.length} link(s) in ${elapsedSince(startedAt)}`);
-    const prompt = buildPrompt(input.name, input.links, linkTexts);
+      emitPhase('fetch');
+      const linkTexts = await fetchLinkContents(input.links.map(l => l.url));
+      console.log(`[announcement ai-parse] fetched ${input.links.length} link(s) in ${elapsedSince(startedAt)}`);
+      const prompt = buildPrompt(input.name, input.links, linkTexts);
 
-    const db = getLocalDb();
+      const db = getLocalDb();
+      const tools = buildTools(db);
 
-    const lookupPatches = tool({
+      emitPhase('analyze');
+      const aiStartedAt = performance.now();
+
+      const first = streamText({
+        model,
+        instructions: SYSTEM_PROMPT,
+        prompt,
+        tools,
+        stopWhen:     isStepCount(12),
+        temperature:  0.1,
+        abortSignal,
+      });
+      writer.merge(toUIMessageStream({ stream: first.stream, tools }));
+
+      let finalText = await first.text;
+      let finishReason = await first.finishReason;
+
+      // Step budget exhausted while still calling tools: force a final answer without tools.
+      if (finalText.trim() === '' && finishReason === 'tool-calls') {
+        const fallback = streamText({
+          model,
+          instructions: SYSTEM_PROMPT,
+          messages:     [{ role: 'user', content: prompt }, ...(await first.responseMessages)],
+          tools,
+          toolChoice:   'none',
+          temperature:  0.1,
+          abortSignal,
+        });
+        writer.merge(toUIMessageStream({ stream: fallback.stream, tools }));
+        finalText = await fallback.text;
+        finishReason = await fallback.finishReason;
+      }
+
+      console.log(`[announcement ai-parse] AI chat finished in ${elapsedSince(aiStartedAt)}`);
+
+      rawText = finalText;
+      rawReason = finishReason;
+      const { header, items } = normalizeAiResult(extractJsonObject(finalText));
+      logInvalidGlow(items);
+      console.log(`[announcement ai-parse] total took ${elapsedSince(startedAt)}`);
+
+      writer.write({ type: 'data-result', data: { header, items } });
+    },
+    onError: error => {
+      const detail = error instanceof Error ? error.message : String(error);
+      const snippet = rawText.trim() === '' ? '(empty output)' : rawText.slice(0, 300);
+      return `AI 返回无法解析的内容：${detail} (finishReason=${rawReason || 'unknown'}). 输出: ${snippet}`;
+    },
+  });
+
+  return createUIMessageStreamResponse({ stream });
+}
+
+function buildTools(db: LocalDb) {
+  return {
+    lookupPatches: tool({
       description: 'Look up Hearthstone patches matching a version string (e.g. "34.0.3"). Returns candidate patches with buildNumber, newest first. Pick the matching buildNumber for header.version.',
       inputSchema: z.object({ version: z.string() }),
       execute:     async ({ version }) => {
@@ -92,9 +132,9 @@ export const aiParse = os
           return [];
         }
       },
-    });
+    }),
 
-    const searchCards = tool({
+    searchCards: tool({
       description: 'Search Hearthstone cards by localized card names. Accepts MULTIPLE names in one call — pass every card name from the announcement at once. Returns cardId candidates per name.',
       inputSchema: z.object({ names: z.string().array().min(1), lang: locale.default('en') }),
       execute:     async ({ names, lang }) => {
@@ -107,60 +147,8 @@ export const aiParse = os
         console.log(`[announcement ai-parse] searchCards took ${elapsedSince(toolStartedAt)} (${results.length} names, ${candidateCount} candidates)`);
         return results;
       },
-    });
-
-    const aiStartedAt = performance.now();
-    let result = await generateTextSafe({
-      model,
-      instructions: SYSTEM_PROMPT,
-      prompt,
-      tools:        { lookupPatches, searchCards },
-      stopWhen:     isStepCount(12),
-      temperature:  0.1,
-    });
-
-    // Step budget exhausted while still calling tools: force a final answer without tools.
-    if (result.text.trim() === '' && result.finishReason === 'tool-calls') {
-      result = await generateTextSafe({
-        model,
-        instructions: SYSTEM_PROMPT,
-        messages:     [{ role: 'user', content: prompt }, ...result.responseMessages],
-        tools:        { lookupPatches, searchCards },
-        toolChoice:   'none',
-        temperature:  0.1,
-      });
-    }
-
-    console.log(`[announcement ai-parse] AI chat finished in ${elapsedSince(aiStartedAt)} (${result.steps.length} steps)`);
-
-    const { text, finishReason } = result;
-    const stepCount = result.steps.length;
-
-    try {
-      const parsed = normalizeAiResult(extractJsonObject(text));
-      logInvalidGlow(parsed.items);
-      console.log(`[announcement ai-parse] total took ${elapsedSince(startedAt)}`);
-      return parsed;
-    } catch (error) {
-      console.error('[announcement ai-parse] unparsable AI output', { finishReason, stepCount, text });
-
-      const detail = error instanceof Error ? error.message : String(error);
-      const snippet = text.trim() === '' ? '(empty output)' : text.slice(0, 300);
-
-      throw new ORPCError('INTERNAL_SERVER_ERROR', {
-        message: `AI returned unparsable response: ${detail} (finishReason=${finishReason}, steps=${stepCount}). Output: ${snippet}`,
-      });
-    }
-  });
-
-async function generateTextSafe(options: Parameters<typeof generateText>[0]) {
-  try {
-    return await generateText(options);
-  } catch (error) {
-    throw new ORPCError('INTERNAL_SERVER_ERROR', {
-      message: `AI API error: ${error instanceof Error ? error.message : String(error)}`,
-    });
-  }
+    }),
+  };
 }
 
 /** Logs glow entries that would fail output schema validation so the actual AI values are visible. */
@@ -250,7 +238,7 @@ After using tools as needed, output ONLY a valid JSON object (no markdown, no ex
 
 Each item has these fields:
 - type: one of "card_change" (legality change: ban/unban/rotation), "card_update" (stat/text change: buff/nerf/rework), "set_change" (set-level event: mini-set release), "rule_change" (rule/mechanic change), "format_birth", "format_death"
-- format: format keyword, or null for all formats. Examples: "standard", "wild", "constructed", "battlegrounds", null
+- format: format keyword, or null for all formats. For any change that applies to constructed play (Standard and Wild together), use "constructed" — never "standard" or "wild". Use "standard"/"wild" only when the source explicitly scopes the change to that single mode. Use "battlegrounds" for Battlegrounds changes. Examples: "constructed", "battlegrounds", "standard", "wild", null
 - status: one of "buff", "nerf", "tweak", "revert", "rework", "text_fix", "text_adjust", "bugged", "bugfix", "banned", "banned_in_card_pool", "banned_in_deck", "legal", "unavailable", "minor", "score", "extend", or null
 - cardId: ONLY for card_change / card_update: the changed card's ID. Must be null for all other types.
 - setId: ONLY for set_change: the set ID. Must be null for all other types.
@@ -265,6 +253,7 @@ Important:
 - Entity references are mutually exclusive by type: card_change/card_update use cardId (+ relatedCards), set_change uses setId, rule_change uses ruleId, format_birth/format_death use none of them. Never fill an id field that does not match the item type.
 - If the announcement mentions multiple cards changed, create one item per card.
 - If a card is both nerfed and banned, create two separate items.
+- For card_change / card_update items that apply to constructed play, set format to "constructed", never to a specific mode such as "standard" or "wild", unless the source explicitly scopes the change to that single mode.
 - For Battlegrounds cards (format: "battlegrounds"), a card removed from the Battlegrounds card pool uses status "unavailable". Do not use "banned" or other legality statuses for Battlegrounds pool removals.
 - Prefer "buff"/"nerf" whenever the direction is clearly stronger or weaker (ignoring extreme edge cases); use "tweak"/"rework" only when the direction is hard to judge. "tweak" is a small numeric adjustment (for example ±1 to stats or a small value change) that does not change the card's function. "rework" is a functional redesign: the card's mechanism changes, a key parameter is replaced, or race/type changes.
 - For Battlegrounds cards (format: "battlegrounds"), a tech level (tavern tier) change takes precedence over any simultaneous stat or text change: base the item on that tier change only and use glow part "tech-level". A tier change is never "rework" — classify it as "buff" or "nerf" by its direction (tier raised = nerf, tier lowered = buff). Do not let the accompanying stat or text changes drive the status.

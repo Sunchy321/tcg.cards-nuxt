@@ -12,6 +12,8 @@ import {
   testDesktopDatabaseConnection,
 } from './lib/runtime/desktop-database';
 import { requireHearthstoneImageBucketDir } from './lib/hearthstone/image-config';
+import { buildAiParseStreamResponse } from './lib/hearthstone/announcement/ai-parse-stream';
+import { hasAiConfig } from './runtime-config';
 import { createTaskStore, createTaskScheduler, createTaskCleanup } from './lib/task';
 import './lib/task/task-definitions';
 
@@ -47,9 +49,14 @@ const testHearthstonePublishTargetInput = z.strictObject({
 });
 
 const testYugiohPublishTargetInput = z.strictObject({
-  publishTargetId: z.string().trim().min(1),
-  environment: z.literal('test'),
+  publishTargetId:  z.string().trim().min(1),
+  environment:      z.literal('test'),
   connectionString: z.string().trim().min(1),
+});
+
+const aiParseStreamInput = z.object({
+  name:  z.string().optional(),
+  links: z.array(z.object({ url: z.string().trim().min(1), label: z.string().optional() })).min(1),
 });
 
 /** Human-readable message normalized from one unknown thrown value. */
@@ -200,6 +207,19 @@ hono.post('/desktop/test-yugioh-publish-target', async c => {
       message: getErrorMessage(error),
     }, 500);
   }
+});
+
+hono.post('/ai/parse/stream', async c => {
+  if (!hasAiConfig()) {
+    return c.json({ error: 'AI config not set. Please configure API key in settings.' }, 400);
+  }
+
+  const parsed = aiParseStreamInput.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid request body: links are required.' }, 400);
+  }
+
+  return buildAiParseStreamResponse(parsed.data, c.req.raw.signal);
 });
 
 hono.all('/rpc/*', async c => {

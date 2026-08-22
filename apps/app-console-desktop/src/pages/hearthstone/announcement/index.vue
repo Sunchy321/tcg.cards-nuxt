@@ -81,12 +81,22 @@
           </UFormField>
           <UFormField label="链接">
             <div class="space-y-2">
-              <div v-for="(link, index) in form.link" :key="index" class="flex gap-2">
-                <UInput v-model="link.url" placeholder="URL" class="flex-1" @update:model-value="handleUrlChange(link, $event)" />
-                <UInput v-model="link.label" placeholder="标签 (可选)" class="w-32" />
-                <UButton icon="i-lucide-external-link" size="sm" color="neutral" variant="ghost" :disabled="!link.url" @click="openUrl(link.url)" />
-                <UButton icon="i-lucide-sparkles" size="sm" color="primary" variant="ghost" :class="{ invisible: link.label !== 'blizzard' }" :disabled="!aiConfigured || !link.url" :loading="link._parsing" @click="handleAiParse(index)" />
-                <UButton icon="i-lucide-x" color="error" variant="ghost" size="sm" @click="removeLink(index)" />
+              <div v-for="(link, index) in form.link" :key="index" class="space-y-2">
+                <div class="flex gap-2">
+                  <UInput v-model="link.url" placeholder="URL" class="flex-1" @update:model-value="handleUrlChange(link, $event)" />
+                  <UInput v-model="link.label" placeholder="标签 (可选)" class="w-32" />
+                  <UButton icon="i-lucide-external-link" size="sm" color="neutral" variant="ghost" :disabled="!link.url" @click="openUrl(link.url)" />
+                  <UButton icon="i-lucide-sparkles" size="sm" color="primary" variant="ghost" :class="{ invisible: link.label !== 'blizzard' }" :disabled="!aiConfigured || !link.url" :loading="link._parsing" @click="handleAiParse(index)" />
+                  <UButton icon="i-lucide-x" color="error" variant="ghost" size="sm" @click="removeLink(index)" />
+                </div>
+                <AnnouncementAiParsePanel
+                  v-if="parseLinkIndex === index"
+                  :name="form.name"
+                  :link="link"
+                  @result="applyParseResult"
+                  @settled="onParseSettled"
+                  @close="closeParsePanel(index)"
+                />
               </div>
               <UButton icon="i-lucide-plus" label="添加链接" variant="ghost" size="sm" @click="addLink" />
             </div>
@@ -322,6 +332,8 @@ const saving = ref(false);
 const projecting = ref(false);
 const aiConfigured = ref(false);
 const crawling = ref(false);
+/** Link index whose streaming AI parse panel is open; null when none. */
+const parseLinkIndex = ref<number | null>(null);
 const patches = ref<Array<{ buildNumber: number, name: string }>>([]);
 const patchOptions = computed(() => patches.value.map(p => ({ label: `${p.buildNumber} · ${p.name}`, value: p.buildNumber })));
 const patchOptionsWithEmpty = computed(() => [{ label: '(与版本相同)', value: 'same' }, ...patchOptions.value]);
@@ -806,16 +818,6 @@ const form = reactive({
   link:          [] as LinkEntry[], items:         [] as ItemForm[],
 });
 
-// Virtual-list sizing for the item cards: card rows are tall, other rows short.
-const itemVirtualizeOptions = {
-  gap:          12,
-  getItemKey:   (index: number) => form.items[index]?._key ?? index,
-  estimateSize: (index: number) => {
-    const item = form.items[index];
-    return item ? (idKindOf(item.type) === 'card' ? 340 : 140) : 200;
-  },
-};
-
 // Resolves placeholder card metadata for items as soon as their cardIds are known.
 watch(
   () => form.items.map(item => item.cardId).filter((id): id is string => !!id),
@@ -1212,34 +1214,56 @@ function toggleItemExpand(key: string) {
   expandedKey.value = expandedKey.value === key ? '' : key;
 }
 
-async function handleAiParse(index: number) {
+/** Opens the streaming AI parse panel for one link and keeps the link marked as parsing. */
+function handleAiParse(index: number) {
   const link = form.link[index];
   if (!link?.url) return;
+  if (!aiConfigured.value) {
+    showToast('AI 未配置', '请在设置中配置 API Key', 'error');
+    return;
+  }
+
+  // If another link is already parsing, clear its flag before switching panels.
+  if (parseLinkIndex.value != null && parseLinkIndex.value !== index) {
+    const prev = form.link[parseLinkIndex.value];
+    if (prev) prev._parsing = false;
+  }
+
+  parseLinkIndex.value = index;
   link._parsing = true;
-  try {
-    const result: any = await client.hearthstone.announcement.aiParse({
-      name:  form.name || undefined,
-      links: [{ url: link.url, label: link.label }],
-    });
+}
 
-    const header = result.header ?? {};
-    if (!form.name && header.name) form.name = header.name;
-    if (!form.date && header.date) form.date = header.date;
-    if (!form.effectiveDate && header.effectiveDate) form.effectiveDate = header.effectiveDate;
-    if (form.version == null && header.version != null) form.version = header.version;
+/** Applies the parsed header and items into the form. */
+function applyParseResult(result: { header: any, items: any[] }) {
+  const header = result.header ?? {};
+  if (!form.name && header.name) form.name = header.name;
+  if (!form.date && header.date) form.date = header.date;
+  if (!form.effectiveDate && header.effectiveDate) form.effectiveDate = header.effectiveDate;
+  if (form.version == null && header.version != null) form.version = header.version;
 
-    const items: ItemForm[] = (result.items ?? []).map((i: any) => ({
-      _key:            crypto.randomUUID(), type:            i.type ?? 'card_update', format:          i.format ?? '',
-      status:          i.status ?? '', group:           i.group ?? '',
-      cardId:          i.cardId ?? '', setId:           i.setId ?? '', ruleId:          i.ruleId ?? '',
-      effectiveDate:   '', version:         undefined, lastVersion:     undefined,
-      relatedCardsStr: Array.isArray(i.relatedCards) ? i.relatedCards.join(', ') : '',
-      delta:           i.delta ?? null, glow:            i.glow ?? null,
-    }));
-    form.items = [...form.items, ...items];
-  } catch (e: any) {
-    showToast('AI 解析失败', e.message, 'error');
-  } finally { link._parsing = false; }
+  const items: ItemForm[] = (result.items ?? []).map((i: any) => ({
+    _key:            crypto.randomUUID(), type:            i.type ?? 'card_update', format:          i.format ?? '',
+    status:          i.status ?? '', group:           i.group ?? '',
+    cardId:          i.cardId ?? '', setId:           i.setId ?? '', ruleId:          i.ruleId ?? '',
+    effectiveDate:   '', version:         undefined, lastVersion:     undefined,
+    relatedCardsStr: Array.isArray(i.relatedCards) ? i.relatedCards.join(', ') : '',
+    delta:           i.delta ?? null, glow:            i.glow ?? null,
+  }));
+  form.items = [...form.items, ...items];
+  showToast('AI 解析完成', `新增 ${items.length} 条条目`, 'success');
+}
+
+/** Clears the parsing flag once the stream settles (result or error). */
+function onParseSettled() {
+  const link = form.link[parseLinkIndex.value ?? -1];
+  if (link) link._parsing = false;
+}
+
+/** Closes the streaming panel and clears the link parsing flag. */
+function closeParsePanel(index: number) {
+  parseLinkIndex.value = null;
+  const link = form.link[index];
+  if (link) link._parsing = false;
 }
 
 async function loadAnnouncements() {
