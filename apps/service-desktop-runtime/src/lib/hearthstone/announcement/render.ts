@@ -199,7 +199,7 @@ function buildRenderRequest(
 }
 
 /** Resolves one announcement side and builds the same request used by the image workflow. */
-async function prepareSingleSide(input: RenderSideInput): Promise<PreparedRender> {
+export async function prepareSingleSide(input: RenderSideInput): Promise<PreparedRender> {
   const resolved = await resolveSideRenderModel(input.cardId, input.buildNumber, input.lang);
   if (!resolved) {
     return {
@@ -229,7 +229,7 @@ async function prepareSingleSide(input: RenderSideInput): Promise<PreparedRender
 
 // ----- Render pipeline -----
 
-async function renderSingleSide(input: RenderSideInput): Promise<RenderResult> {
+export async function renderSingleSide(input: RenderSideInput): Promise<RenderResult> {
   const db = getLocalDb();
   const prepared = await prepareSingleSide(input);
 
@@ -338,56 +338,72 @@ async function renderSingleSide(input: RenderSideInput): Promise<RenderResult> {
 
 // ----- Public API -----
 
+/** Announcement item shape that drives per-side card rendering. */
+export interface RenderItemLike {
+  itemKey:      string;
+  type:         string;
+  cardId:       string | null;
+  format:       string | null;
+  version?:     number | null;
+  lastVersion?: number | null;
+  delta?:       { prev?: Partial<RenderModel>, curr?: Partial<RenderModel> } | null;
+  glow?:        GlowEntry[] | null;
+}
+
+/** Builds the per-side render inputs for announcement items, without rendering. */
+export function buildRenderSideInputs(
+  items: RenderItemLike[],
+  announcement: { version: number, lastVersion?: number | null },
+  langs: Locale[],
+): RenderSideInput[] {
+  const inputs: RenderSideInput[] = [];
+  const resolveVersion = (itemV?: number | null, fallback?: number | null, root?: number) =>
+    itemV ?? fallback ?? root!;
+
+  for (const item of items) {
+    if (!item.cardId) continue;
+
+    if (item.type === 'card_change') {
+      const version = resolveVersion(item.version, undefined, announcement.version);
+      for (const lang of langs) {
+        inputs.push({
+          itemKey:     item.itemKey, side: 'base', cardId: item.cardId, buildNumber: version, lang,
+          format:      item.format, delta: item.delta?.curr,
+        });
+      }
+    }
+
+    if (item.type === 'card_update') {
+      const version = resolveVersion(item.version, undefined, announcement.version);
+      const lastVersion = resolveVersion(item.lastVersion, announcement.lastVersion, announcement.version);
+      for (const lang of langs) {
+        // prev (no glow)
+        inputs.push({
+          itemKey:     item.itemKey, side: 'prev', cardId: item.cardId, buildNumber: lastVersion, lang,
+          format:      item.format, delta: item.delta?.prev,
+        });
+        // curr (with glow)
+        inputs.push({
+          itemKey:     item.itemKey, side: 'curr', cardId: item.cardId, buildNumber: version, lang,
+          format:      item.format, delta: item.delta?.curr, glow: item.glow,
+        });
+      }
+    }
+  }
+
+  return inputs;
+}
+
 /** Renders all applicable sides for one announcement item. */
 export async function renderItem(
-  item: {
-    itemKey:      string;
-    type:         string;
-    cardId:       string | null;
-    format:       string | null;
-    version?:     number | null;
-    lastVersion?: number | null;
-    delta?:       { prev?: Partial<RenderModel>, curr?: Partial<RenderModel> } | null;
-    glow?:        GlowEntry[] | null;
-  },
+  item: RenderItemLike,
   announcement: { version: number, lastVersion?: number | null },
   langs: Locale[],
 ): Promise<RenderResult[]> {
   const results: RenderResult[] = [];
-
-  if (!item.cardId) return results;
-
-  const resolveVersion = (itemV?: number | null, fallback?: number | null, root?: number) =>
-    itemV ?? fallback ?? root!;
-
-  if (item.type === 'card_change') {
-    const version = resolveVersion(item.version, undefined, announcement.version);
-    for (const lang of langs) {
-      results.push(await renderSingleSide({
-        itemKey:     item.itemKey, side:        'base', cardId:      item.cardId, buildNumber: version, lang,
-        format:      item.format, delta:       item.delta?.curr,
-      }));
-    }
+  for (const input of buildRenderSideInputs([item], announcement, langs)) {
+    results.push(await renderSingleSide(input));
   }
-
-  if (item.type === 'card_update') {
-    const version = resolveVersion(item.version, undefined, announcement.version);
-    const lastVersion = resolveVersion(item.lastVersion, announcement.lastVersion, announcement.version);
-
-    for (const lang of langs) {
-      // prev (no glow)
-      results.push(await renderSingleSide({
-        itemKey:     item.itemKey, side:        'prev', cardId:      item.cardId, buildNumber: lastVersion, lang,
-        format:      item.format, delta:       item.delta?.prev,
-      }));
-      // curr (with glow)
-      results.push(await renderSingleSide({
-        itemKey:     item.itemKey, side:        'curr', cardId:      item.cardId, buildNumber: version, lang,
-        format:      item.format, delta:       item.delta?.curr, glow:        item.glow,
-      }));
-    }
-  }
-
   return results;
 }
 

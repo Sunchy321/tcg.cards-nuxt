@@ -42,7 +42,14 @@
           <div class="flex items-center gap-2">
             <UButton v-if="form.id" icon="i-lucide-wand" label="投影" color="neutral" variant="ghost" size="sm" :loading="projecting" @click="handleProject" />
             <USelect v-model="renderLang" :items="renderLangOptions" class="w-28" />
-            <UButton icon="i-lucide-database" label="全部写入存储" color="primary" variant="ghost" size="sm" :loading="renderingAll" :disabled="!form.version" @click="handleRenderAll" />
+            <UButton
+              icon="i-lucide-database"
+              :label="renderAllLabel"
+              :color="renderAllColor"
+              :loading="renderAllRun?.status === 'loading'"
+              :disabled="!form.version || renderAllRun?.status === 'loading' || renderAllRun?.status === 'running'"
+              @click="handleRenderAll"
+            />
             <UButton
               icon="i-lucide-images"
               :label="mode === 'image' ? '表单模式' : '图片模式'"
@@ -326,13 +333,22 @@
         </div>
       </template>
     </UModal>
+
+    <UModal v-model:open="showRenderAllConfirm" title="确认写入全部图片" description="将重新渲染并写入所有卡图（覆盖已存在的图片）。此操作不可撤销。">
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton label="取消" color="neutral" variant="ghost" @click="showRenderAllConfirm = false" />
+          <UButton label="确认写入" color="error" @click="confirmRenderAll" />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useDesktopRuntimeClient } from '~/composables/useDesktopRuntimeClient';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { changeStatusByType, glowPart, group as groupEnum } from '#model/hearthstone/schema/announcement';
 import type { ChangeStatus, GameChangeType, GlowEntry } from '#model/hearthstone/schema/announcement';
@@ -398,7 +414,25 @@ const glowTypeColors: Record<GlowEntry['type'], { color: string, colorize: strin
   rework:  { color: '#D6A900', colorize: '#FFF09A', hiColor: '#FFD43B' },
   neutral: { color: '#1677C8', colorize: '#9DDCFF', hiColor: '#3B9EFF' },
 };
-const renderingAll = ref(false);
+/** Running/completed bulk render-to-storage task; null when idle. */
+const renderAllRun = ref<{ mode: 'missing' | 'all', done: number, total: number, status: 'loading' | 'running' | 'done' | 'error' } | null>(null);
+/** Whether the Option/Alt key is held, switching the button between missing/all modes. */
+const altHeld = ref(false);
+const showRenderAllConfirm = ref(false);
+
+const renderAllLabel = computed(() => {
+  const run = renderAllRun.value;
+  const base = run
+    ? (run.mode === 'missing' ? '写入缺失图片' : '写入全部图片')
+    : (altHeld.value ? '写入全部图片' : '写入缺失图片');
+  if (!run || run.status === 'loading') return base;
+  return `${base} (${run.done}/${run.total})`;
+});
+
+const renderAllColor = computed(() => {
+  const mode = renderAllRun.value ? renderAllRun.value.mode : (altHeld.value ? 'all' : 'missing');
+  return mode === 'all' ? 'error' : 'primary';
+});
 const showClearItemsModal = ref(false);
 const sortModalOpen = ref(false);
 const sortSnapshot = ref<ItemForm[]>([]);
@@ -660,45 +694,88 @@ async function handleRenderItem(index: number) {
   }
 }
 
-async function handleRenderAll() {
+/** Handles the "写入缺失/全部图片" button: all-mode confirms first, missing-mode runs directly. */
+function handleRenderAll() {
   if (!form.version) return;
-  renderingAll.value = true;
+  const run = renderAllRun.value;
+  if (run && (run.status === 'done' || run.status === 'error')) {
+    // Locked on the pressed mode; re-running follows the displayed text.
+    if (run.mode === 'all') showRenderAllConfirm.value = true;
+    else void runRenderAllFlow('missing');
+    return;
+  }
+  if (run) return; // loading/running — the button is disabled anyway
+  if (altHeld.value) showRenderAllConfirm.value = true;
+  else void runRenderAllFlow('missing');
+}
+
+function confirmRenderAll() {
+  showRenderAllConfirm.value = false;
+  void runRenderAllFlow('all');
+}
+
+/** Runs a bulk render-to-storage task with live (done/total) progress. */
+async function runRenderAllFlow(mode: 'missing' | 'all') {
+  if (!form.version) return;
+  const cardItems = form.items
+    .filter(item => (item.type === 'card_change' || item.type === 'card_update') && item.cardId)
+    .map(item => ({
+      itemKey:     item._key, type:        item.type, cardId:      item.cardId, format:      item.format,
+      version:     item.version ?? null, lastVersion: item.lastVersion ?? null,
+      delta:       item.delta,
+      glow:        item.glow,
+    }));
+  if (cardItems.length === 0) return;
+
+  // Persist the current announcement before writing images.
+  if (await saveAnnouncement() == null) return;
+
+  renderAllRun.value = { mode, done: 0, total: 0, status: 'loading' };
   try {
-    const cardItems = form.items
-      .map(item => {
-        if ((item.type === 'card_change' || item.type === 'card_update') && item.cardId) {
-          return {
-            itemKey:     item._key, type:        item.type, cardId:      item.cardId, format:      item.format,
-            version:     item.version ?? null, lastVersion: item.lastVersion ?? null,
-            delta:       item.delta,
-            glow:        item.glow,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean) as any[];
-
-    if (cardItems.length === 0) return;
-
-    // Persist the current announcement before writing images.
-    if (await saveAnnouncement() == null) return;
-
-    const langs = renderLang.value === 'all' ? [] : [renderLang.value];
-    const res: any = await client.hearthstone.announcement.renderItems({
-      items:       cardItems,
-      version:     form.version,
-      lastVersion: form.lastVersion ?? null,
-      langs,
+    const res = await fetch('http://localhost:4318/render/stream', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({
+        items:       cardItems,
+        version:     form.version,
+        lastVersion: form.lastVersion ?? null,
+        langs:       renderLang.value === 'all' ? [] : [renderLang.value],
+        mode,
+      }),
     });
-    for (const item of form.items) {
-      if (cardItems.some(cardItem => cardItem.itemKey === item._key)) {
-        await applyRenderResults(item, res.results ?? []);
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop() ?? '';
+      for (const part of parts) {
+        const line = part.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        const data = JSON.parse(line.slice(6));
+        if (data.type === 'total' && renderAllRun.value) {
+          renderAllRun.value.total = data.total;
+          renderAllRun.value.status = 'running';
+        } else if (data.type === 'progress' && renderAllRun.value) {
+          renderAllRun.value.done = data.done;
+        } else if (data.type === 'end') {
+          if (renderAllRun.value) renderAllRun.value.status = 'done';
+        } else if (data.type === 'error') {
+          showToast('写入失败', data.message, 'error');
+          if (renderAllRun.value) renderAllRun.value.status = 'error';
+        }
       }
     }
+    if (renderAllRun.value && renderAllRun.value.status !== 'error') renderAllRun.value.status = 'done';
+    await loadExistingImages();
   } catch (e: any) {
-    showToast('渲染失败', e.message, 'error');
-  } finally {
-    renderingAll.value = false;
+    if (renderAllRun.value) renderAllRun.value.status = 'error';
+    showToast('写入失败', e.message ?? String(e), 'error');
   }
 }
 
@@ -1552,5 +1629,31 @@ onMounted(async () => {
     patches.value = patchList ?? [];
     if (patchList?.length > 0) form.version = patchList[0].buildNumber;
   } catch { /* ignore */ }
+});
+
+// Option/Alt key tracking: switches the "写入缺失/全部图片" button while held.
+function onAltKey(e: KeyboardEvent) {
+  const held = e.type === 'keydown';
+  if (e.key === 'Alt' && altHeld.value !== held) altHeld.value = held;
+}
+function onWindowBlur() {
+  if (altHeld.value) altHeld.value = false;
+}
+
+// A finished task stays locked to its pressed mode until the user changes alt.
+watch(altHeld, () => {
+  const run = renderAllRun.value;
+  if (run && (run.status === 'done' || run.status === 'error')) renderAllRun.value = null;
+});
+
+onMounted(() => {
+  window.addEventListener('keydown', onAltKey);
+  window.addEventListener('keyup', onAltKey);
+  window.addEventListener('blur', onWindowBlur);
+});
+onUnmounted(() => {
+  window.removeEventListener('keydown', onAltKey);
+  window.removeEventListener('keyup', onAltKey);
+  window.removeEventListener('blur', onWindowBlur);
 });
 </script>
