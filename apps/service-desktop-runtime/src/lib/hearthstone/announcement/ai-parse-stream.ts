@@ -238,12 +238,11 @@ After using tools as needed, output ONLY a valid JSON object (no markdown, no ex
 
 Each item has these fields:
 - type: one of "card_change" (legality change: ban/unban/rotation), "card_update" (stat/text change: buff/nerf/rework), "set_change" (set-level event: mini-set release), "rule_change" (rule/mechanic change), "format_birth", "format_death"
-- format: format keyword, or null for all formats. For any change that applies to constructed play (Standard and Wild together), use "constructed" — never "standard" or "wild". Use "standard"/"wild" only when the source explicitly scopes the change to that single mode. Use "battlegrounds" for Battlegrounds changes. Examples: "constructed", "battlegrounds", "standard", "wild", null
+- format: format keyword, or null for all formats. For a constructed-mode card_update, format must ALWAYS be "constructed" — never "standard" or "wild". For Battlegrounds changes (including card_update), use "battlegrounds". For other change types, use "constructed" for any change that applies to constructed play (Standard and Wild together), and use "standard"/"wild" only when the source explicitly scopes the change to that single mode. Examples: "constructed", "battlegrounds", "standard", "wild", null
 - status: one of "buff", "nerf", "tweak", "revert", "rework", "text_fix", "text_adjust", "bugged", "bugfix", "banned", "banned_in_card_pool", "banned_in_deck", "legal", "unavailable", "minor", "score", "extend", or null
 - cardId: ONLY for card_change / card_update: the changed card's ID. Must be null for all other types.
 - setId: ONLY for set_change: the set ID. Must be null for all other types.
 - ruleId: ONLY for rule_change: rule identifier (free text, optionally prefixed like "set:core"). Must be null for all other types.
-- delta: null, or { "prev": { ...old render model field values }, "curr": { ...new render model field values } }. Each side is a partial RenderModel. Put old values stated by the announcement in prev and new values in curr. Include only fields explicitly supported by the source.
 - glow: null, or array of { part: one of ${glowPart.options.map(v => `"${v}"`).join(' | ')}, type: "buff" | "nerf" | "rework" | "neutral" } identifying each changed card part. Use "buff" when the part became stronger, "nerf" when it became weaker, "rework" for a functional redesign that is not meaningfully directional, and "neutral" for a presentation or wording change that does not affect gameplay. Use "tech-level" for Battlegrounds tavern tier changes. Use "trinket-size" for Battlegrounds trinket size changes (a lesser → greater trinket is a nerf, the reverse is a buff). Do not invent glow entries when the nature of the change is ambiguous.
 - relatedCards: ONLY for card_change / card_update: related card IDs affected by this change (e.g. the collectible card that summons a changed token). Must be an empty array for all other types.
 - group: ONLY for card_change items that are part of a bulk rotation. Allowed values: ${groupEnum.options.map(v => `"${v}"`).join(', ')}. Use null for all other items, including non-rotation changes. Never invent other group values.
@@ -253,13 +252,14 @@ Important:
 - Entity references are mutually exclusive by type: card_change/card_update use cardId (+ relatedCards), set_change uses setId, rule_change uses ruleId, format_birth/format_death use none of them. Never fill an id field that does not match the item type.
 - If the announcement mentions multiple cards changed, create one item per card.
 - If a card is both nerfed and banned, create two separate items.
-- For card_change / card_update items that apply to constructed play, set format to "constructed", never to a specific mode such as "standard" or "wild", unless the source explicitly scopes the change to that single mode.
+- For constructed-mode card_update items, format must always be "constructed", never a specific mode such as "standard" or "wild". Battlegrounds card_update items keep format "battlegrounds". For other card_change items that apply to constructed play, use "constructed" unless the source explicitly scopes them to a single mode.
+- Never output a "delta" field under any circumstances.
 - For Battlegrounds cards (format: "battlegrounds"), a card removed from the Battlegrounds card pool uses status "unavailable". Do not use "banned" or other legality statuses for Battlegrounds pool removals.
 - Prefer "buff"/"nerf" whenever the direction is clearly stronger or weaker (ignoring extreme edge cases); use "tweak"/"rework" only when the direction is hard to judge. "tweak" is a small numeric adjustment (for example ±1 to stats or a small value change) that does not change the card's function. "rework" is a functional redesign: the card's mechanism changes, a key parameter is replaced, or race/type changes.
 - For Battlegrounds cards (format: "battlegrounds"), a tech level (tavern tier) change takes precedence over any simultaneous stat or text change: base the item on that tier change only and use glow part "tech-level". A tier change is never "rework" — classify it as "buff" or "nerf" by its direction (tier raised = nerf, tier lowered = buff). Do not let the accompanying stat or text changes drive the status.
 - For mini-set releases (35 new cards), create one set_change item with type "set_change" and status "extend".
 - Use searchCards to resolve cardIds instead of guessing; if no candidate matches, use null.
 - Use lookupPatches to resolve header.version; if no candidate matches, use null.
-- For card_update items, preserve both old and new values when the source states both. Use null for delta or glow when the source does not provide enough information to determine them reliably.
+- For card_update items, preserve both old and new values when the source states both. Use null for glow when the source does not provide enough information to determine it reliably.
 - Only include fields that are actually present; use null for absent fields.
 - The final answer must be ONLY valid JSON, no markdown, no explanation.`;
