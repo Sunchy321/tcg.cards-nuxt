@@ -50,22 +50,7 @@
               :disabled="!form.version || renderAllRun?.status === 'loading' || renderAllRun?.status === 'running'"
               @click="handleRenderAll"
             />
-            <UButton
-              icon="i-lucide-images"
-              :label="mode === 'image' ? '表单模式' : '图片模式'"
-              :color="mode === 'image' ? 'primary' : 'neutral'"
-              variant="ghost"
-              size="sm"
-              @click="toggleImageMode"
-            />
-            <UButton
-              :icon="mode === 'text' ? 'i-lucide-form-input' : 'i-lucide-file-code'"
-              :label="mode === 'text' ? '表单模式' : '文本编辑'"
-              :color="mode === 'text' ? 'primary' : 'neutral'"
-              variant="ghost"
-              size="sm"
-              @click="toggleTextMode"
-            />
+            <USelect :model-value="mode" :items="modeOptions" class="w-28" @update:model-value="setEditorMode($event)" />
             <UButton v-if="mode === 'form'" icon="i-lucide-plus" label="添加条目" color="primary" variant="soft" size="sm" @click="addItem" />
             <UButton label="取消" color="neutral" variant="ghost" size="sm" @click="resetForm" />
             <UButton label="保存" size="sm" :loading="saving" @click="handleSubmit" />
@@ -439,6 +424,11 @@ const sortSnapshot = ref<ItemForm[]>([]);
 /** Editor view: form editor, YAML text editor, or image-only gallery. */
 type EditorMode = 'form' | 'text' | 'image';
 const mode = ref<EditorMode>('form');
+const modeOptions = [
+  { label: '表单模式', value: 'form' },
+  { label: '文本编辑', value: 'text' },
+  { label: '图片模式', value: 'image' },
+];
 const yamlText = ref('');
 const textErrors = ref<ParseError[]>([]);
 const textPendingCount = ref(0);
@@ -1370,7 +1360,6 @@ function handleTextParsed(result: ParsedResult) {
   form.items = next;
 }
 
-/** Switches between form and text editing modes, serializing items on enter. */
 /** True when leaving text mode is safe (nothing pending, or the user confirms). */
 function canLeaveTextMode(): boolean {
   if (textErrors.value.length === 0 && textPendingCount.value === 0) return true;
@@ -1380,28 +1369,19 @@ function canLeaveTextMode(): boolean {
   return confirm(`退出文本模式将丢弃：${detail}，且条目列表回退到上次有效状态。确定退出？`);
 }
 
-function toggleTextMode() {
-  if (mode.value !== 'text') {
-    mode.value = 'text';
+/** Switches the editor view; serializes items when entering text, reloads images when needed. */
+function setEditorMode(value: unknown) {
+  const next = value as EditorMode;
+  if (next === mode.value) return;
+  // Leaving text mode with pending work requires confirmation.
+  if (mode.value === 'text' && next !== 'text' && !canLeaveTextMode()) return;
+  const wasText = mode.value === 'text';
+  if (next === 'text' && !wasText) {
     yamlText.value = serializeItems(form.items.map(toTextItem));
-    return;
   }
-  if (!canLeaveTextMode()) return;
-  mode.value = 'form';
-  // Text-mode live sync clears previews of changed items; reload stored images
-  // so the form shows them again.
-  void loadExistingImages();
-}
-
-/** Switches between the form and image-only gallery views. */
-function toggleImageMode() {
-  if (mode.value === 'image') {
-    mode.value = 'form';
-    return;
-  }
-  if (mode.value === 'text' && !canLeaveTextMode()) return;
-  mode.value = 'image';
-  void loadExistingImages();
+  mode.value = next;
+  // Text-mode live sync clears previews; reload stored images when leaving text or entering image.
+  if (next === 'image' || (next === 'form' && wasText)) void loadExistingImages();
 }
 
 function openSortModal() {
