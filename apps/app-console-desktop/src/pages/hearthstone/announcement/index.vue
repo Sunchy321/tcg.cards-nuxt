@@ -44,14 +44,22 @@
             <USelect v-model="renderLang" :items="renderLangOptions" class="w-28" />
             <UButton icon="i-lucide-database" label="全部写入存储" color="primary" variant="ghost" size="sm" :loading="renderingAll" :disabled="!form.version" @click="handleRenderAll" />
             <UButton
-              :icon="isTextMode ? 'i-lucide-form-input' : 'i-lucide-file-code'"
-              :label="isTextMode ? '表单模式' : '文本编辑'"
-              color="neutral"
+              icon="i-lucide-images"
+              :label="mode === 'image' ? '表单模式' : '图片模式'"
+              :color="mode === 'image' ? 'primary' : 'neutral'"
+              variant="ghost"
+              size="sm"
+              @click="toggleImageMode"
+            />
+            <UButton
+              :icon="mode === 'text' ? 'i-lucide-form-input' : 'i-lucide-file-code'"
+              :label="mode === 'text' ? '表单模式' : '文本编辑'"
+              :color="mode === 'text' ? 'primary' : 'neutral'"
               variant="ghost"
               size="sm"
               @click="toggleTextMode"
             />
-            <UButton v-if="!isTextMode" icon="i-lucide-plus" label="添加条目" color="primary" variant="soft" size="sm" @click="addItem" />
+            <UButton v-if="mode === 'form'" icon="i-lucide-plus" label="添加条目" color="primary" variant="soft" size="sm" @click="addItem" />
             <UButton label="取消" color="neutral" variant="ghost" size="sm" @click="resetForm" />
             <UButton label="保存" size="sm" :loading="saving" @click="handleSubmit" />
           </div>
@@ -104,7 +112,7 @@
 
           <!-- Items -->
           <div class="border-t border-slate-200 pt-4">
-            <div v-if="!isTextMode" class="mb-3 flex items-center justify-between">
+            <div v-if="mode === 'form'" class="mb-3 flex items-center justify-between">
               <span class="text-sm font-medium text-slate-700">公告条目（{{ form.items.length }}）</span>
               <div class="flex items-center gap-1">
                 <UButton v-if="form.items.length > 1" icon="i-lucide-arrow-up-down" label="排序" size="xs" variant="ghost" @click="openSortModal" />
@@ -112,12 +120,36 @@
               </div>
             </div>
             <AnnouncementItemTextEditor
-              v-if="isTextMode"
+              v-if="mode === 'text'"
               v-model="yamlText"
               :search="textSearch"
               class="h-[70vh]"
               @parsed="handleTextParsed"
             />
+            <div v-else-if="mode === 'image'" class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4">
+              <div
+                v-for="item in imageItems"
+                :key="item._key"
+                class="flex flex-col items-center gap-2 rounded-lg border border-slate-200 p-3"
+              >
+                <span class="truncate text-sm font-medium">{{ tileTitle(item) }}</span>
+                <div class="flex items-center justify-center gap-2">
+                  <div v-for="side in expectedSides(item.type)" :key="side" class="flex flex-col items-center gap-1">
+                    <CardImage
+                      class="w-28"
+                      :src="previewSrc(item._key, side)"
+                      :card-id="item.cardId"
+                      :version="form.version ?? 0"
+                      :type="cardMetaOf(item)?.type ?? 'minion'"
+                      :variant="item.format === 'battlegrounds' ? 'battlegrounds' : 'normal'"
+                      :mechanics="cardMetaOf(item)?.mechanics"
+                    />
+                    <span class="text-xs text-slate-400">{{ side }}</span>
+                  </div>
+                </div>
+              </div>
+              <p v-if="imageItems.length === 0" class="col-span-full py-8 text-center text-sm text-slate-400">暂无卡牌条目</p>
+            </div>
             <div v-else class="space-y-3">
               <div v-for="(item, index) in form.items" :key="item._key" class="rounded-lg border border-slate-200">
                 <div class="flex cursor-pointer items-center gap-2 px-3 py-2" @click="toggleItemExpand(item._key)">
@@ -136,10 +168,16 @@
                 <div v-if="expandedKey === item._key" class="border-t border-slate-200 p-3">
                 <div class="grid grid-cols-3 gap-x-4 gap-y-3">
                   <UFormField label="类型" required>
-                    <USelect v-model="item.type" :items="itemTypeOptions" class="w-full" />
+                    <USelect :model-value="item.type" :items="itemTypeOptions" class="w-full" @update:model-value="handleTypeChange(item, $event)" />
                   </UFormField>
-                  <UFormField label="状态">
-                    <USelect v-model="item.status" :items="statusOptions" class="w-full" />
+                  <UFormField v-if="statusOptionsFor(item.type).length > 0" label="状态">
+                    <USelect
+                      v-model="item.status"
+                      :items="statusOptionsFor(item.type)"
+                      :color="statusGlowConflict(item) ? 'warning' : undefined"
+                      :leading-icon="statusGlowConflict(item) ? 'i-lucide-triangle-alert' : undefined"
+                      class="w-full"
+                    />
                   </UFormField>
                   <UFormField label="赛制 (keyword)">
                     <UInput v-model="item.format" placeholder="standard / constructed" class="w-full" />
@@ -296,8 +334,8 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { useDesktopRuntimeClient } from '~/composables/useDesktopRuntimeClient';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
-import { glowPart, group as groupEnum } from '#model/hearthstone/schema/announcement';
-import type { GlowEntry } from '#model/hearthstone/schema/announcement';
+import { changeStatusByType, glowPart, group as groupEnum } from '#model/hearthstone/schema/announcement';
+import type { ChangeStatus, GameChangeType, GlowEntry } from '#model/hearthstone/schema/announcement';
 import type { RenderModel } from '#model/hearthstone/schema/entity';
 import { mergePreviews, selectPreview, type SidePreview } from '~/utils/announcement-preview';
 import { deriveGroup, idKindOf, serializeItems, type ParseError, type ParsedResult, type ResolvedCardName, type TextItem } from '~/utils/announcement-yaml';
@@ -317,7 +355,7 @@ interface ItemDelta {
 }
 interface ItemForm {
   id?: string; _key: string; type: string; effectiveDate: string; format: string;
-  status: string; group: string; version?: number; lastVersion?: number;
+  status: ChangeStatus; group: string; version?: number; lastVersion?: number;
   cardId: string; setId: string; ruleId: string; relatedCardsStr: string;
   delta: ItemDelta | null; glow: GlowEntry[] | null;
   /** Whether the group is auto-derived from format + card type (false once manually set). */
@@ -334,6 +372,10 @@ const aiConfigured = ref(false);
 const crawling = ref(false);
 /** Link index whose streaming AI parse panel is open; null when none. */
 const parseLinkIndex = ref<number | null>(null);
+/** Item key of the currently expanded item editor; accordion-style (single expanded). */
+const expandedKey = ref<string>('');
+/** True once the form has been loaded/hydrated; suppresses cardId refresh on initial load. */
+const hydrated = ref(false);
 const patches = ref<Array<{ buildNumber: number, name: string }>>([]);
 const patchOptions = computed(() => patches.value.map(p => ({ label: `${p.buildNumber} · ${p.name}`, value: p.buildNumber })));
 const patchOptionsWithEmpty = computed(() => [{ label: '(与版本相同)', value: 'same' }, ...patchOptions.value]);
@@ -360,7 +402,9 @@ const renderingAll = ref(false);
 const showClearItemsModal = ref(false);
 const sortModalOpen = ref(false);
 const sortSnapshot = ref<ItemForm[]>([]);
-const isTextMode = ref(false);
+/** Editor view: form editor, YAML text editor, or image-only gallery. */
+type EditorMode = 'form' | 'text' | 'image';
+const mode = ref<EditorMode>('form');
 const yamlText = ref('');
 const textErrors = ref<ParseError[]>([]);
 const textPendingCount = ref(0);
@@ -592,6 +636,8 @@ async function handleRenderItem(index: number) {
   renderingItems[itemKey] = true;
   Reflect.deleteProperty(renderErrors, itemKey);
   try {
+    // Persist the current announcement before writing the image.
+    if (await saveAnnouncement() == null) return;
     const langs = renderLang.value === 'all' ? [] : [renderLang.value];
     console.log('[render] calling renderItems', { cardId: item.cardId, version: form.version, langs });
     const res: any = await client.hearthstone.announcement.renderItems({
@@ -633,6 +679,9 @@ async function handleRenderAll() {
       .filter(Boolean) as any[];
 
     if (cardItems.length === 0) return;
+
+    // Persist the current announcement before writing images.
+    if (await saveAnnouncement() == null) return;
 
     const langs = renderLang.value === 'all' ? [] : [renderLang.value];
     const res: any = await client.hearthstone.announcement.renderItems({
@@ -689,7 +738,7 @@ async function applyRenderResults(item: ItemForm, results: any[]) {
 }
 
 const emptyItem = (): ItemForm => ({
-  _key:            crypto.randomUUID(), type:            'card_update', effectiveDate:   '', format:          '', status:          '',
+  _key:            crypto.randomUUID(), type:            'card_update', effectiveDate:   '', format:          '', status:          'buff',
   group:           '', version:         undefined, lastVersion:     undefined,
   cardId:          '', setId:           '', ruleId:          '', relatedCardsStr: '',
   delta:           null, glow:            null,
@@ -707,16 +756,21 @@ function addGlow(item: ItemForm) {
 /** Item key currently computing glow; empty when idle. */
 const glowCalculatingId = ref('');
 
-/** Computes glow for a card_update item by diffing its prev/curr card versions. */
-async function computeGlow(item: ItemForm) {
+/**
+ * Computes glow for a card_update item by diffing its prev/curr card versions.
+ * `silent` suppresses toasts and the button spinner (used for auto-compute on
+ * cardId change); `replace` swaps the whole glow instead of merging.
+ */
+async function computeGlow(item: ItemForm, options: { silent?: boolean, replace?: boolean } = {}) {
+  const { silent = false, replace = false } = options;
   if (!item.cardId) return;
   const version = item.version ?? form.version;
   const lastVersion = item.lastVersion ?? form.lastVersion ?? form.version;
   if (version == null || lastVersion == null) {
-    showToast('缺少版本信息', '请先选择公告版本', 'error');
+    if (!silent) showToast('缺少版本信息', '请先选择公告版本', 'error');
     return;
   }
-  glowCalculatingId.value = item._key;
+  if (!silent) glowCalculatingId.value = item._key;
   try {
     const glow = await client.hearthstone.announcement.computeCardGlow({
       cardId: item.cardId,
@@ -726,14 +780,15 @@ async function computeGlow(item: ItemForm) {
       delta:  item.delta ?? undefined,
     });
     if (glow.length === 0) {
-      showToast('未检测到变化');
+      if (!silent) showToast('未检测到变化');
       return;
     }
-    mergeGlow(item, glow);
+    if (replace) item.glow = sortGlowEntries(glow);
+    else mergeGlow(item, glow);
   } catch (error) {
-    showToast('计算高亮失败', error instanceof Error ? error.message : String(error), 'error');
+    if (!silent) showToast('计算高亮失败', error instanceof Error ? error.message : String(error), 'error');
   } finally {
-    glowCalculatingId.value = '';
+    if (!silent) glowCalculatingId.value = '';
   }
 }
 
@@ -818,6 +873,9 @@ const form = reactive({
   link:          [] as LinkEntry[], items:         [] as ItemForm[],
 });
 
+/** Card items shown in the image-only gallery (only types that render a card image). */
+const imageItems = computed(() => form.items.filter(item => expectedSides(item.type).length > 0));
+
 // Resolves placeholder card metadata for items as soon as their cardIds are known.
 watch(
   () => form.items.map(item => item.cardId).filter((id): id is string => !!id),
@@ -875,17 +933,53 @@ function handleGroupSelect(item: ItemForm, value: unknown) {
   item._groupAuto = false;
 }
 
-const statusOptions = [
-  { label: 'buff', value: 'buff' }, { label: 'nerf', value: 'nerf' },
-  { label: 'tweak', value: 'tweak' }, { label: 'revert', value: 'revert' },
-  { label: 'rework', value: 'rework' }, { label: 'text_fix', value: 'text_fix' },
-  { label: 'text_adjust', value: 'text_adjust' }, { label: 'bugged', value: 'bugged' },
-  { label: 'bugfix', value: 'bugfix' }, { label: 'banned', value: 'banned' },
-  { label: 'banned_in_card_pool', value: 'banned_in_card_pool' }, { label: 'banned_in_deck', value: 'banned_in_deck' },
-  { label: 'legal', value: 'legal' }, { label: 'unavailable', value: 'unavailable' },
-  { label: 'minor', value: 'minor' }, { label: 'score', value: 'score' },
-  { label: 'extend', value: 'extend' },
-];
+/** Status dropdown options for a change type (empty when the type has no status). */
+function statusOptionsFor(type: string) {
+  const config = changeStatusByType[type as GameChangeType];
+  return config ? config.statuses.map(status => ({ label: status, value: status })) : [];
+}
+
+/** Switches an item's type, resetting its status to the new type's default when invalid. */
+function handleTypeChange(item: ItemForm, value: unknown) {
+  const type = String(value);
+  if (type === item.type) return;
+  item.type = type;
+  const config = changeStatusByType[type as GameChangeType];
+  if (!config) return;
+  if (item.status && !config.statuses.includes(item.status as ChangeStatus)) {
+    item.status = config.default ?? 'buff';
+  }
+}
+
+/** Glow parts that only change a numeric stat; a numeric-only change is never a rework. */
+const NUMERIC_GLOW_PARTS = new Set(['attack', 'health', 'cost', 'durability', 'armor']);
+
+/** True when a card_update's status direction conflicts with its glow parts. */
+function statusGlowConflict(item: ItemForm): boolean {
+  if (item.type !== 'card_update') return false;
+  const glow = item.glow ?? [];
+  if (glow.length === 0) return false;
+  const status = item.status;
+  if (!status) return false;
+
+  const types = glow.map(entry => entry.type);
+  const allNerf = types.every(t => t === 'nerf');
+  const allBuff = types.every(t => t === 'buff');
+
+  // A glow that is entirely one direction must not claim the opposite, a tweak, or a rework.
+  // A mix that includes a rework/neutral part is left alone (it can justify status "rework").
+  if (allNerf && (status === 'buff' || status === 'tweak' || status === 'rework')) return true;
+  if (allBuff && (status === 'nerf' || status === 'tweak' || status === 'rework')) return true;
+
+  // A pure numeric adjustment (only numeric parts, all directional) is never a rework.
+  // A glow carrying a rework/neutral type is a redesign or wording change, so rework stays valid.
+  const allNumericParts = glow.every(entry => NUMERIC_GLOW_PARTS.has(entry.part));
+  const allDirectional = types.every(t => t === 'buff' || t === 'nerf');
+  if (allNumericParts && allDirectional && status === 'rework') return true;
+
+  return false;
+}
+
 const toast = useToast();
 
 function showToast(title: string, description?: string, color?: 'error' | 'success') {
@@ -904,9 +998,11 @@ function resetForm() {
   });
   selectedId.value = null;
   isCreating.value = false;
-  isTextMode.value = false;
+  mode.value = 'form';
   textErrors.value = [];
   textPendingCount.value = 0;
+  // An empty/new form is a resting state: subsequent card picks should refresh.
+  hydrated.value = true;
 }
 
 function fillForm(row: any) {
@@ -927,7 +1023,7 @@ function fillForm(row: any) {
     delta:           i.delta ?? null, glow:            i.glow ?? null,
   }));
   isCreating.value = false;
-  isTextMode.value = false;
+  mode.value = 'form';
   textErrors.value = [];
   textPendingCount.value = 0;
 }
@@ -944,6 +1040,8 @@ async function loadDetail(id: string) {
     if (selectedId.value !== id) return;
     fillForm(detail);
     await loadExistingImages();
+    // Initial hydration done; from here on, cardId edits refresh their own image.
+    hydrated.value = true;
   } catch (e: any) { showToast('加载详情失败', e.message, 'error'); }
 }
 
@@ -978,6 +1076,54 @@ async function loadExistingImages() {
       renderedItems[item._key] = true;
     }
   } catch { /* silently skip if images not available */ }
+}
+
+/** Clears stale previews and re-fetches the stored images for one item (used on cardId change). */
+async function refreshItemImage(item: ItemForm) {
+  clearItemPreviewState(item._key);
+  if (!item.cardId || !form.version) return; // cleared card → placeholder
+  try {
+    const res: any = await client.hearthstone.announcement.getItemImages({
+      items: [{
+        itemKey:     item._key, type:        item.type, cardId:      item.cardId, format:      item.format,
+        version:     item.version ?? null, lastVersion: item.lastVersion ?? null,
+        delta:       item.delta,
+        glow:        item.glow,
+      }],
+      version:     form.version,
+      lastVersion: form.lastVersion ?? null,
+      langs:       renderLang.value === 'all' ? [] : [renderLang.value],
+    });
+    const images = (res.images ?? []).filter((img: any) => img.itemKey === item._key && img.hash);
+    if (images.length === 0) return; // no stored image for the new card yet; show placeholder
+    itemPreviews[item._key] = images.map((img: any) => ({
+      side: img.side, lang: img.lang, hash: img.hash, category: img.category, template: img.template, base64: '', source: 'storage',
+    }));
+    renderedItems[item._key] = true;
+  } catch { /* silently skip if images not available */ }
+}
+
+// Refresh the rendered preview whenever a cardId changes, but skip the initial
+// hydration pass (loadExistingImages already covers it).
+watch(() => form.items.map(item => [item._key, item.cardId] as const), (pairs, prevPairs) => {
+  if (!hydrated.value) return;
+  const prev = new Map(prevPairs ?? []);
+  for (const [key, cardId] of pairs) {
+    if (prev.get(key) !== cardId) {
+      const item = form.items.find(i => i._key === key);
+      if (item) void handleItemCardIdChanged(item);
+    }
+  }
+});
+
+/** Runs when an item's cardId changes: auto-compute glow only when uncomputed, then refresh the stored image. */
+async function handleItemCardIdChanged(item: ItemForm) {
+  // Auto-compute only for items that have no glow yet, so manually adjusted glow survives
+  // bulk triggers (e.g. reload after saving a new announcement rekeys every item).
+  if (item.type === 'card_update' && item.cardId && (item.glow == null || item.glow.length === 0)) {
+    await computeGlow(item, { silent: true, replace: true });
+  }
+  await refreshItemImage(item);
 }
 
 function createNew() {
@@ -1036,12 +1182,15 @@ function removeLink(i: number) {
 /** Appends a new item inheriting type/format/status from the previous one, if any. */
 function addItem() {
   const last = form.items[form.items.length - 1];
-  form.items.push({
+  const item = {
     ...emptyItem(),
     type:   last?.type ?? 'card_update',
     format: last?.format ?? '',
-    status: last?.status ?? '',
-  });
+    status: last?.status ?? 'buff',
+  };
+  form.items.push(item);
+  // Auto-expand the newly added item so it is immediately editable.
+  expandedKey.value = item._key;
 }
 
 function removeItem(i: number) {
@@ -1145,21 +1294,36 @@ function handleTextParsed(result: ParsedResult) {
 }
 
 /** Switches between form and text editing modes, serializing items on enter. */
+/** True when leaving text mode is safe (nothing pending, or the user confirms). */
+function canLeaveTextMode(): boolean {
+  if (textErrors.value.length === 0 && textPendingCount.value === 0) return true;
+  const detail = textPendingCount.value > 0
+    ? `${textPendingCount.value} 个 cardId 搜索未完成`
+    : '当前文本存在错误';
+  return confirm(`退出文本模式将丢弃：${detail}，且条目列表回退到上次有效状态。确定退出？`);
+}
+
 function toggleTextMode() {
-  if (!isTextMode.value) {
+  if (mode.value !== 'text') {
+    mode.value = 'text';
     yamlText.value = serializeItems(form.items.map(toTextItem));
-    isTextMode.value = true;
     return;
   }
-  if (textErrors.value.length > 0 || textPendingCount.value > 0) {
-    const detail = textPendingCount.value > 0
-      ? `${textPendingCount.value} 个 cardId 搜索未完成`
-      : '当前文本存在错误';
-    if (!confirm(`退出文本模式将丢弃：${detail}，且条目列表回退到上次有效状态。确定退出？`)) return;
-  }
-  isTextMode.value = false;
+  if (!canLeaveTextMode()) return;
+  mode.value = 'form';
   // Text-mode live sync clears previews of changed items; reload stored images
   // so the form shows them again.
+  void loadExistingImages();
+}
+
+/** Switches between the form and image-only gallery views. */
+function toggleImageMode() {
+  if (mode.value === 'image') {
+    mode.value = 'form';
+    return;
+  }
+  if (mode.value === 'text' && !canLeaveTextMode()) return;
+  mode.value = 'image';
   void loadExistingImages();
 }
 
@@ -1206,8 +1370,6 @@ function tileMeta(item: ItemForm): string {
 function groupLabel(group: string): string {
   return GROUP_LABELS[group] ?? group;
 }
-
-const expandedKey = ref<string>('');
 
 /** Toggles an item's expanded editor; accordion-style (single expanded). */
 function toggleItemExpand(key: string) {
@@ -1277,62 +1439,79 @@ async function loadAnnouncements() {
   }
 }
 
-async function handleSubmit() {
-  if (!form.name.trim()) {
-    showToast('名称不能为空', '', 'error');
-    return;
-  }
+/** Serializes the current form into the announcement save payload. */
+function buildPayload() {
+  return {
+    source:        form.source, date:          form.date, effectiveDate: form.effectiveDate || null,
+    version:       form.version!, lastVersion:   form.lastVersion ?? null, name:          form.name.trim(),
+    link:          form.link.filter(l => l.url),
+    items:         form.items.map(item => {
+      const kind = idKindOf(item.type);
+      return {
+        type:          item.type, effectiveDate: item.effectiveDate || null,
+        format:        item.format || null, status:        item.status || null,
+        group:         item.group || null, version:       item.version ?? null, lastVersion:   item.lastVersion ?? null,
+        cardId:        kind === 'card' ? item.cardId || null : null,
+        setId:         kind === 'set' ? item.setId || null : null,
+        ruleId:        kind === 'rule' ? item.ruleId || null : null,
+        relatedCards:  kind === 'card' ? parseRelatedCards(item.relatedCardsStr) : [],
+        delta:         item.delta, glow:          item.glow,
+      };
+    }),
+  };
+}
 
-  if (!form.date) {
-    showToast('日期不能为空', '', 'error');
-    return;
-  }
-
-  if (form.version == null) {
-    showToast('版本不能为空', '', 'error');
-    return;
-  }
+/**
+ * Persists the current form (create or update) and returns the announcement id.
+ * Returns null when the form is invalid, so callers (save button, render flows)
+ * can abort before proceeding.
+ */
+async function saveAnnouncement(): Promise<string | null> {
+  if (saving.value) return form.id ?? null;
   saving.value = true;
   try {
-    const payload = {
-      source:        form.source, date:          form.date, effectiveDate: form.effectiveDate || null,
-      version:       form.version, lastVersion:   form.lastVersion ?? null, name:          form.name.trim(),
-      link:          form.link.filter(l => l.url),
-      items:         form.items.map(item => {
-        const kind = idKindOf(item.type);
-        return {
-          type:          item.type, effectiveDate: item.effectiveDate || null,
-          format:        item.format || null, status:        item.status || null,
-          group:         item.group || null, version:       item.version ?? null, lastVersion:   item.lastVersion ?? null,
-          cardId:        kind === 'card' ? item.cardId || null : null,
-          setId:         kind === 'set' ? item.setId || null : null,
-          ruleId:        kind === 'rule' ? item.ruleId || null : null,
-          relatedCards:  kind === 'card' ? parseRelatedCards(item.relatedCardsStr) : [],
-          delta:         item.delta, glow:          item.glow,
-        };
-      }),
-    };
-    let nextId: string | null = form.id ?? null;
+    if (!form.name.trim()) {
+      showToast('名称不能为空', '', 'error');
+      return null;
+    }
+    if (!form.date) {
+      showToast('日期不能为空', '', 'error');
+      return null;
+    }
+    if (form.version == null) {
+      showToast('版本不能为空', '', 'error');
+      return null;
+    }
+
+    const payload = buildPayload();
     if (isCreating.value) {
       const created = await client.hearthstone.announcement.create(payload);
-      nextId = created.id;
-    } else if (form.id) {
-      await client.hearthstone.announcement.update({ id: form.id, ...payload });
+      form.id = created.id;
+      isCreating.value = false;
+      return created.id;
     }
+    if (form.id) {
+      await client.hearthstone.announcement.update({ id: form.id, ...payload });
+      return form.id;
+    }
+    return null;
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function handleSubmit() {
+  try {
+    const nextId = await saveAnnouncement();
+    if (nextId == null) return;
     showToast('保存成功', '', 'success');
     await loadAnnouncements();
     // Keep the saved announcement selected so the editor stays on it after saving.
-    if (nextId) {
-      selectedId.value = nextId;
-      isCreating.value = false;
-      await loadDetail(nextId);
-    } else {
-      resetForm();
-    }
+    selectedId.value = nextId;
+    isCreating.value = false;
+    await loadDetail(nextId);
   } catch (e: any) {
     showToast('保存失败', e.message, 'error');
-  } finally {
-    saving.value = false;
   }
 }
 

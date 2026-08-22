@@ -1,5 +1,7 @@
 import {
+  type ChangeStatus,
   changeStatus,
+  changeStatusByType,
   gameChangeType,
   glowPart,
   glowType,
@@ -35,7 +37,7 @@ export interface TextItem {
   type:          string;
   effectiveDate: string;
   format:        string;
-  status:        string;
+  status:        ChangeStatus;
   group:         string;
   version?:      number;
   lastVersion?:  number;
@@ -106,7 +108,7 @@ function emptyItem(type: string): TextItem {
     type,
     effectiveDate: '',
     format:        '',
-    status:        '',
+    status:        'buff',
     group:         '',
     cardId:        '',
     setId:         '',
@@ -238,8 +240,12 @@ export function parseItemsYaml(text: string): ParsedResult {
     if (!type) itemErrors.push({ line: itemLine, message: '缺少必填字段 type' });
     else if (!gameChangeType.options.includes(type as never)) itemErrors.push({ line: itemLine, message: `type 非法: ${type}` });
 
-    const status = raw.status == null ? '' : String(raw.status);
-    if (status && !changeStatus.options.includes(status as never)) itemErrors.push({ line: itemLine, message: `status 非法: ${status}` });
+    const status = raw.status == null ? 'buff' : String(raw.status) as ChangeStatus;
+    if (status && !changeStatus.options.includes(status as never)) {
+      itemErrors.push({ line: itemLine, message: `status 非法: ${status}` });
+    } else if (status && changeStatusByType[type as keyof typeof changeStatusByType]?.statuses.includes(status as never) === false) {
+      itemErrors.push({ line: itemLine, message: `status 与 type(${type}) 不匹配: ${status}` });
+    }
 
     const group = raw.group == null ? '' : String(raw.group);
     if (group && !groupEnum.options.includes(group as never)) itemErrors.push({ line: itemLine, message: `group 非法: ${group}` });
