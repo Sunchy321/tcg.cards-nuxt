@@ -22,7 +22,7 @@
             <div class="flex items-center gap-1 text-xs text-slate-400">
               <span>{{ item.date }}</span>
               <span>·</span>
-              <span>{{ item.source }}</span>
+              <span>{{ sourceLabel(item.source) }}</span>
             </div>
           </div>
           <UButton icon="i-lucide-trash-2" color="error" variant="ghost" size="xs" class="opacity-0 group-hover:opacity-100" @click.stop="confirmDelete(item)" />
@@ -1006,7 +1006,19 @@ watch(
 
 const selectedAnnouncement = computed(() => announcements.value.find(a => a.id === selectedId.value) ?? null);
 
-const sourceOptions = [{ label: 'Blizzard', value: 'blizzard' }, { label: '系列发售', value: 'release' }];
+const sourceOptions = [
+  { label: 'Blizzard', value: 'blizzard' },
+  { label: '热修', value: 'hotfix' },
+  { label: '系列发售', value: 'release' },
+];
+
+const sourceLabels: Record<string, string> = {
+  blizzard: 'Blizzard', 'blizzard-cn': '国服', release: '系列发售', hotfix: '热修',
+};
+
+function sourceLabel(source: string): string {
+  return sourceLabels[source] ?? source;
+}
 
 const itemTypeOptions = [
   { label: 'card_change', value: 'card_change' }, { label: 'card_update', value: 'card_update' },
@@ -1020,7 +1032,7 @@ const GROUP_LABELS: Record<string, string> = {
   bg_minion:       '战棋随从',
   bg_trinket:      '战棋饰品',
   bg_tavern_spell: '战棋酒馆法术',
-  bg_anomaly:      '战棋异变',
+  bg_anomaly:      '战棋畸变',
 };
 
 const groupOptions = [
@@ -1332,6 +1344,7 @@ function addLink() {
 const AUTO_LABELS: Record<string, string> = {
   'playhearthstone.com':      'blizzard',
   'hearthstone.blizzard.com': 'blizzard',
+  'forums.blizzard.com':      'blizzard',
   'hs.blizzard.cn':           'blizzard-cn',
 };
 
