@@ -155,6 +155,7 @@
                     <span v-if="item.status" class="text-xs text-slate-600">{{ item.status }}</span>
                     <span v-if="item.format" class="text-xs text-slate-500">{{ item.format }}</span>
                     <span v-if="item.group" class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-200">{{ groupLabel(item.group) }}</span>
+                    <UButton icon="i-lucide-plus" color="neutral" variant="ghost" size="xs" title="在当前条目后添加" @click.stop="addItemAfter(index)" />
                     <UButton icon="i-lucide-chevron-up" color="neutral" variant="ghost" size="xs" :disabled="index === 0" @click.stop="moveItem(index, -1)" />
                     <UButton icon="i-lucide-chevron-down" color="neutral" variant="ghost" size="xs" :disabled="index === form.items.length - 1" @click.stop="moveItem(index, 1)" />
                     <UButton icon="i-lucide-x" color="error" variant="ghost" size="xs" @click.stop="removeItem(index)" />
@@ -174,12 +175,17 @@
                       class="w-full"
                     />
                   </UFormField>
-                  <UFormField label="赛制 (keyword)">
-                    <UInput v-model="item.format" placeholder="standard / constructed" class="w-full" />
+                  <UFormField label="赛制">
+                    <USelect
+                      :model-value="item.format === '' ? '__all__' : item.format"
+                      :items="formatOptions"
+                      class="w-full"
+                      @update:model-value="item.format = $event === '__all__' ? '' : String($event)"
+                    />
                   </UFormField>
                   <!-- Non-card types: single ID field row -->
-                  <UFormField v-if="idKindOf(item.type) === 'set'" label="系列ID"><UInput v-model="item.setId" /></UFormField>
-                  <UFormField v-else-if="idKindOf(item.type) === 'rule'" label="规则ID"><UInput v-model="item.ruleId" /></UFormField>
+                  <UFormField v-if="idKindOf(item.type) === 'set'" label="系列ID"><UInput v-model="item.setId" autocomplete="off" autocapitalize="none" spellcheck="false" /></UFormField>
+                  <UFormField v-else-if="idKindOf(item.type) === 'rule'" label="规则ID"><UInput v-model="item.ruleId" autocomplete="off" autocapitalize="none" spellcheck="false" /></UFormField>
 
                   <!-- Card types: identity, glow, and previews -->
                   <template v-if="idKindOf(item.type) === 'card'">
@@ -1026,6 +1032,16 @@ const itemTypeOptions = [
   { label: 'format_birth', value: 'format_birth' }, { label: 'format_death', value: 'format_death' },
 ];
 
+const formatOptions = [
+  { label: '全部格式', value: '__all__' },
+  { label: '标准 standard', value: 'standard' },
+  { label: '狂野 wild', value: 'wild' },
+  { label: '构筑 constructed', value: 'constructed' },
+  { label: '幻变 twist', value: 'twist' },
+  { label: '佣兵 mercenaries', value: 'mercenaries' },
+  { label: '战棋 battlegrounds', value: 'battlegrounds' },
+];
+
 const GROUP_LABELS: Record<string, string> = {
   core_rotation:   '核心系列轮替',
   bg_hero:         '战棋英雄',
@@ -1396,6 +1412,20 @@ function addItem() {
     status: last?.status ?? 'buff',
   };
   form.items.push(item);
+  // Auto-expand the newly added item so it is immediately editable.
+  expandedKey.value = item._key;
+}
+
+/** Inserts a new item after the given one, inheriting its type/format/status. */
+function addItemAfter(index: number) {
+  const current = form.items[index];
+  const item = {
+    ...emptyItem(),
+    type:   current?.type ?? 'card_update',
+    format: current?.format ?? '',
+    status: current?.status ?? 'buff',
+  };
+  form.items.splice(index + 1, 0, item);
   // Auto-expand the newly added item so it is immediately editable.
   expandedKey.value = item._key;
 }

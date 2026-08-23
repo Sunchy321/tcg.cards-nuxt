@@ -240,10 +240,15 @@ export function parseItemsYaml(text: string): ParsedResult {
     if (!type) itemErrors.push({ line: itemLine, message: '缺少必填字段 type' });
     else if (!gameChangeType.options.includes(type as never)) itemErrors.push({ line: itemLine, message: `type 非法: ${type}` });
 
-    const status = raw.status == null ? 'buff' : String(raw.status) as ChangeStatus;
-    if (status && !changeStatus.options.includes(status as never)) {
+    const typeConfig = changeStatusByType[type as keyof typeof changeStatusByType];
+    const allowed = typeConfig?.statuses ?? [];
+    let status: string = raw.status == null ? (typeConfig?.default ?? '') : String(raw.status);
+    if (status && allowed.length === 0) {
+      // Type carries no status (rule_change / format_*); strip silently instead of dropping.
+      status = '';
+    } else if (status && !changeStatus.options.includes(status as never)) {
       itemErrors.push({ line: itemLine, message: `status 非法: ${status}` });
-    } else if (status && changeStatusByType[type as keyof typeof changeStatusByType]?.statuses.includes(status as never) === false) {
+    } else if (status && !allowed.includes(status as never)) {
       itemErrors.push({ line: itemLine, message: `status 与 type(${type}) 不匹配: ${status}` });
     }
 

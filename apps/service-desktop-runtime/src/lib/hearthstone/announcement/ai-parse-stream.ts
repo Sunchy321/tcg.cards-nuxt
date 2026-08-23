@@ -242,7 +242,7 @@ Each item has these fields:
 - status: one of "buff", "nerf", "tweak", "revert", "rework", "text_fix", "text_adjust", "bugged", "bugfix", "banned", "banned_in_card_pool", "banned_in_deck", "legal", "unavailable", "minor", "score", "extend", or null
 - cardId: ONLY for card_change / card_update: the changed card's ID. Must be null for all other types.
 - setId: ONLY for set_change: the set ID. Must be null for all other types.
-- ruleId: ONLY for rule_change: rule identifier (free text, optionally prefixed like "set:core"). Must be null for all other types.
+- ruleId: ONLY for rule_change: rule identifier (free text) encoding the rule and its state, e.g. "season:14" for a season change, "anomaly:on" / "trinket:off" for a mechanic toggle. Must be null for all other types.
 - glow: null, or array of { part: one of ${glowPart.options.map(v => `"${v}"`).join(' | ')}, type: "buff" | "nerf" | "rework" | "neutral" } identifying each changed card part. Use "buff" when the part became stronger, "nerf" when it became weaker, "rework" for a functional redesign that is not meaningfully directional, and "neutral" for a presentation or wording change that does not affect gameplay. Use "tech-level" for Battlegrounds tavern tier changes. Use "trinket-size" for Battlegrounds trinket size changes (a lesser → greater trinket is a nerf, the reverse is a buff). Do not invent glow entries when the nature of the change is ambiguous.
 - relatedCards: ONLY for card_change / card_update: related card IDs affected by this change (e.g. the collectible card that summons a changed token). Must be an empty array for all other types.
 - group: ONLY for card_change items that are part of a bulk rotation. Allowed values: ${groupEnum.options.map(v => `"${v}"`).join(', ')}. Use null for all other items, including non-rotation changes. Never invent other group values.
@@ -250,6 +250,7 @@ Each item has these fields:
 
 Important:
 - Entity references are mutually exclusive by type: card_change/card_update use cardId (+ relatedCards), set_change uses setId, rule_change uses ruleId, format_birth/format_death use none of them. Never fill an id field that does not match the item type.
+- rule_change items must never include a status; encode any on/off state into ruleId (e.g. "anomaly:on", "trinket:off").
 - If the announcement mentions multiple cards changed, create one item per card.
 - If a card is both nerfed and banned, create two separate items.
 - For constructed-mode card_update items, format must always be "constructed", never a specific mode such as "standard" or "wild". Battlegrounds card_update items keep format "battlegrounds". For other card_change items that apply to constructed play, use "constructed" unless the source explicitly scopes them to a single mode.
