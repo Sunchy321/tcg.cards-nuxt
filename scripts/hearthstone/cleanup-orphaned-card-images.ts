@@ -156,7 +156,8 @@ for (const item of items) {
     for (const lang of ALL_LANGS) {
       const model = resolveModel(item.cardId!, version, lang);
       if (!model) continue;
-      protectedHashes.add(computeRenderHash(mergeDelta(model, delta?.curr)));
+      // A delta.curr.cardId override is ignored; the curr card is item.cardId.
+      protectedHashes.add(computeRenderHash({ ...mergeDelta(model, delta?.curr), cardId: item.cardId! }));
       announcementHashCount += 1;
     }
   }
@@ -165,7 +166,9 @@ for (const item of items) {
     const version = resolveVersion(item.version, undefined, announcement.version);
     const lastVersion = resolveVersion(item.lastVersion, announcement.lastVersion, announcement.version);
     for (const lang of ALL_LANGS) {
-      const prevModel = resolveModel(item.cardId!, lastVersion, lang);
+      // A delta.prev.cardId overrides the "before" card for a different-card comparison.
+      const prevCardId = delta?.prev?.cardId ?? item.cardId!;
+      const prevModel = resolveModel(prevCardId, lastVersion, lang);
       if (prevModel) {
         protectedHashes.add(computeRenderHash(mergeDelta(prevModel, delta?.prev)));
         announcementHashCount += 1;

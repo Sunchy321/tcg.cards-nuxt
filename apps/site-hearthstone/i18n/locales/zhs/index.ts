@@ -501,6 +501,12 @@ export default {
       bg_trinket:      '酒馆战棋饰品',
       bg_tavern_spell: '酒馆战棋法术',
       bg_anomaly:      '酒馆战棋异常',
+      bg_timewarped:   '时空扭曲',
+      quest:           '任务牌',
+      c_thun:          '克苏恩',
+      hero:            '英雄牌',
+      invoke:          '祈求牌',
+      odd_even:        '奇偶牌',
     },
 
     changeType: {

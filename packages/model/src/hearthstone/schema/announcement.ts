@@ -20,6 +20,8 @@ export const legality = z.enum([
 ]).describe('legality');
 
 export const changeStatus = z.enum([
+  // placeholder: overridden by glow computation
+  'unknown',
   // card_update
   'buff',
   'nerf',
@@ -54,11 +56,11 @@ export type Legalities = Record<string, Legality>;
  */
 export const changeStatusByType: Record<GameChangeType, { statuses: ChangeStatus[], default: ChangeStatus | null }> = {
   card_update: {
-    statuses: ['buff', 'nerf', 'tweak', 'revert', 'rework', 'text_fix', 'text_adjust', 'bugged', 'bugfix'],
+    statuses: ['unknown', 'buff', 'nerf', 'tweak', 'revert', 'rework', 'text_fix', 'text_adjust', 'bugged', 'bugfix'],
     default:  'buff',
   },
   card_change: {
-    statuses: [...legality.options],
+    statuses: ['unknown', ...legality.options],
     default:  'banned',
   },
   set_change: {
@@ -105,6 +107,12 @@ export const group = z.enum([
   'bg_trinket',
   'bg_tavern_spell',
   'bg_anomaly',
+  'bg_timewarped',
+  'quest',
+  'c_thun',
+  'hero',
+  'invoke',
+  'odd_even',
 ]);
 
 export const announcementItem = z.strictObject({

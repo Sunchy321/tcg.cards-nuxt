@@ -50,6 +50,7 @@ interface ResolvedSide {
   localizationHash: string;
   version:          number[];
   setDbfId:         number;
+  mechanics:        Record<string, boolean | number>;
 }
 
 /** Couples one derived announcement side with its standard image request. */
@@ -76,6 +77,7 @@ async function resolveSideRenderModel(
     localizationHash: EntityLocalization.localizationHash,
     version:          Entity.version,
     setDbfId:         HearthstoneSet.dbfId,
+    mechanics:        Entity.mechanics,
   })
     .from(Entity)
     .innerJoin(EntityLocalization, and(
@@ -102,6 +104,7 @@ async function resolveSideRenderModel(
     localizationHash: row.localizationHash,
     version:          row.version,
     setDbfId:         row.setDbfId ?? 0,
+    mechanics:        row.mechanics as Record<string, boolean | number>,
   };
 }
 
@@ -116,6 +119,7 @@ interface SideRenderModelRow {
   revisionHash:        string;
   localizationHash:    string;
   setDbfId:            number | null;
+  mechanics:           Record<string, boolean | number> | null;
 }
 
 /** Fetches render-model rows for many (cardId, lang) pairs in a single query. */
@@ -132,6 +136,7 @@ async function fetchSideRenderModelRows(cardIds: string[], langs: Locale[]): Pro
     revisionHash:        Entity.revisionHash,
     localizationHash:    EntityLocalization.localizationHash,
     setDbfId:            HearthstoneSet.dbfId,
+    mechanics:           Entity.mechanics,
   })
     .from(Entity)
     .innerJoin(EntityLocalization, and(
@@ -164,6 +169,9 @@ function resolveTemplate(format: string | null): string {
 
 // ----- Request builder -----
 
+/** The mechanic tag marking a card as premium (has a golden version). */
+const PREMIUM_MECHANIC = '12';
+
 function buildRenderRequest(
   cardId: string,
   lang: Locale,
@@ -174,10 +182,11 @@ function buildRenderRequest(
   category: 'base' | 'glow',
   r2Bucket: string,
 ): ImageRequirementRequest {
+  const mechanics = resolved.mechanics ?? {};
   const variant = {
     zone:     'hand' as const,
     template: template as 'normal' | 'battlegrounds',
-    premium:  'normal' as const,
+    premium:  mechanics[PREMIUM_MECHANIC] ? 'golden' as const : 'normal' as const,
     category,
   };
   const candidate: ImageCandidateRow = {
@@ -192,7 +201,7 @@ function buildRenderRequest(
     set:              String(renderModel.set),
     setDbfId:         resolved.setDbfId,
     techLevel:        renderModel.techLevel ?? null,
-    mechanics:        {},
+    mechanics,
   };
 
   return buildRequest(candidate, variant, r2Bucket);
@@ -210,7 +219,8 @@ export async function prepareSingleSide(input: RenderSideInput): Promise<Prepare
 
   const isCurr = input.side === 'curr';
   const category = isCurr && input.glow && input.glow.length > 0 ? 'glow' : 'base';
-  const merged = mergeDeltaOnto(resolved.renderModel, input.delta);
+  // The side stays on `input.cardId`; a delta.cardId override is ignored.
+  const merged = { ...mergeDeltaOnto(resolved.renderModel, input.delta), cardId: input.cardId };
   const renderModel = isCurr ? applyGlow(merged, input.glow) : merged;
   const renderHash = computeRenderHash(renderModel);
   const request = buildRenderRequest(
@@ -312,7 +322,7 @@ export async function renderSingleSide(input: RenderSideInput): Promise<RenderRe
       lang:           input.lang,
       zone:           'hand',
       template,
-      premium:        'normal',
+      premium:        request.variant.premium,
       r2Bucket,
       r2Key:          request.target!.r2Key!,
       contentType:    'image/webp',
@@ -367,8 +377,8 @@ export function buildRenderSideInputs(
       const version = resolveVersion(item.version, undefined, announcement.version);
       for (const lang of langs) {
         inputs.push({
-          itemKey:     item.itemKey, side: 'base', cardId: item.cardId, buildNumber: version, lang,
-          format:      item.format, delta: item.delta?.curr,
+          itemKey:     item.itemKey, side:        'base', cardId:      item.cardId, buildNumber: version, lang,
+          format:      item.format, delta:       item.delta?.curr,
         });
       }
     }
@@ -377,15 +387,15 @@ export function buildRenderSideInputs(
       const version = resolveVersion(item.version, undefined, announcement.version);
       const lastVersion = resolveVersion(item.lastVersion, announcement.lastVersion, announcement.version);
       for (const lang of langs) {
-        // prev (no glow)
+        // prev (no glow); a delta.prev.cardId overrides the "before" card.
         inputs.push({
-          itemKey:     item.itemKey, side: 'prev', cardId: item.cardId, buildNumber: lastVersion, lang,
-          format:      item.format, delta: item.delta?.prev,
+          itemKey:     item.itemKey, side:        'prev', cardId:      item.delta?.prev?.cardId ?? item.cardId, buildNumber: lastVersion, lang,
+          format:      item.format, delta:       item.delta?.prev,
         });
         // curr (with glow)
         inputs.push({
-          itemKey:     item.itemKey, side: 'curr', cardId: item.cardId, buildNumber: version, lang,
-          format:      item.format, delta: item.delta?.curr, glow: item.glow,
+          itemKey:     item.itemKey, side:        'curr', cardId:      item.cardId, buildNumber: version, lang,
+          format:      item.format, delta:       item.delta?.curr, glow:        item.glow,
         });
       }
     }
@@ -440,7 +450,7 @@ export async function prepareItemRequests(
     const lastVersion = item.lastVersion ?? announcement.lastVersion ?? announcement.version;
     for (const lang of langs) {
       prepared.push(await prepareSingleSide({
-        itemKey:     item.itemKey, side:        'prev', cardId:      item.cardId!, buildNumber: lastVersion, lang,
+        itemKey:     item.itemKey, side:        'prev', cardId:      item.delta?.prev?.cardId ?? item.cardId!, buildNumber: lastVersion, lang,
         format:      item.format, delta:       item.delta?.prev,
       }));
       prepared.push(await prepareSingleSide({
@@ -539,8 +549,9 @@ export async function checkItemImages(
       const lastVersion = resolveVersion(item.lastVersion, announcement.lastVersion, announcement.version);
 
       for (const lang of langsOrDefault) {
-        // prev
-        const prevResolved = resolveCached(item.cardId, lastVersion, lang as Locale);
+        // prev; a delta.prev.cardId overrides the "before" card for a different-card comparison.
+        const prevCardId = item.delta?.prev?.cardId ?? item.cardId;
+        const prevResolved = resolveCached(prevCardId, lastVersion, lang as Locale);
         if (prevResolved) {
           const prevMerged = mergeDeltaOnto(prevResolved.renderModel, item.delta?.prev);
           results.push({ itemKey: item.itemKey, cardId: item.cardId, side: 'prev', lang, hash: computeRenderHash(prevMerged), category: 'base', template });
@@ -548,7 +559,8 @@ export async function checkItemImages(
         // curr
         const currResolved = resolveCached(item.cardId, version, lang as Locale);
         if (currResolved) {
-          const currMerged = mergeDeltaOnto(currResolved.renderModel, item.delta?.curr);
+          // A delta.curr.cardId override is ignored; the curr card is item.cardId.
+          const currMerged = { ...mergeDeltaOnto(currResolved.renderModel, item.delta?.curr), cardId: item.cardId };
           const currWithGlow = applyGlow(currMerged, item.glow);
           const category = item.glow && item.glow.length > 0 ? 'glow' : 'base';
           results.push({ itemKey: item.itemKey, cardId: item.cardId, side: 'curr', lang, hash: computeRenderHash(currWithGlow), category, template });

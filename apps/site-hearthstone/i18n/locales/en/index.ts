@@ -495,6 +495,12 @@ export default {
       bg_trinket:      'Battlegrounds trinkets',
       bg_tavern_spell: 'Battlegrounds spells',
       bg_anomaly:      'Battlegrounds anomalies',
+      bg_timewarped:   'Timewarped',
+      quest:           'Quest cards',
+      c_thun:          'C\'Thun',
+      hero:            'Hero cards',
+      invoke:          'Invoke cards',
+      odd_even:        'Odd & even cards',
     },
 
     changeType: {

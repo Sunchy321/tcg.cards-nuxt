@@ -129,7 +129,7 @@
                   <div v-for="side in expectedSides(item.type)" :key="side" class="flex flex-col items-center gap-1">
                     <CardImage
                       class="w-28"
-                      :src="previewSrc(item._key, side)"
+                      :src="previewSrc(item, side)"
                       :card-id="item.cardId"
                       :version="form.version ?? 0"
                       :type="cardMetaOf(item)?.type ?? 'minion'"
@@ -139,12 +139,25 @@
                     <span class="text-xs text-slate-400">{{ side }}</span>
                   </div>
                 </div>
+                <div class="flex items-center gap-1">
+                  <UButton icon="i-lucide-edit" size="xs" variant="ghost" title="表单模式编辑此项" @click="jumpToItem(item)" />
+                  <UButton icon="i-lucide-eye" size="xs" variant="ghost" title="预览" :loading="previewingItems[item._key]" :disabled="!form.version || !item.cardId" @click="handlePreviewItem(form.items.indexOf(item))" />
+                  <UButton icon="i-lucide-database" size="xs" variant="ghost" title="写入存储" :loading="renderingItems[item._key]" :disabled="!form.version || !item.cardId" @click="handleRenderItem(form.items.indexOf(item))" />
+                  <span v-if="renderErrors[item._key]" class="text-xs text-red-500">{{ renderErrors[item._key] }}</span>
+                </div>
               </div>
               <p v-if="imageItems.length === 0" class="col-span-full py-8 text-center text-sm text-slate-400">暂无卡牌条目</p>
             </div>
             <div v-else class="space-y-3">
               <div v-for="(item, index) in form.items" :key="item._key" class="rounded-lg border border-slate-200">
-                <div class="flex cursor-pointer items-center gap-2 px-3 py-2" @click="toggleItemExpand(item._key)">
+                <div
+                  class="flex cursor-pointer items-center gap-2 px-3 py-2"
+                  :class="itemHasWarning(item) ? 'bg-amber-50 dark:bg-amber-500/10' : ''"
+                  @click="toggleItemExpand(item._key)"
+                >
+                  <span v-if="itemHasWarning(item)" class="shrink-0 text-amber-500" title="待处理">
+                    <UIcon name="i-lucide-triangle-alert" class="size-3.5" />
+                  </span>
                   <span class="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium" :class="typeColor(item.type).pill">{{ item.type }}</span>
                   <span class="truncate text-sm font-medium">{{ tileTitle(item) }}</span>
                   <span v-if="item.cardId || item.setId || item.ruleId" class="shrink-0 text-xs text-slate-500">{{ item.cardId || item.setId || item.ruleId }}</span>
@@ -170,8 +183,8 @@
                     <USelect
                       v-model="item.status"
                       :items="statusOptionsFor(item.type)"
-                      :color="statusGlowConflict(item) ? 'warning' : undefined"
-                      :leading-icon="statusGlowConflict(item) ? 'i-lucide-triangle-alert' : undefined"
+                      :color="itemHasWarning(item) ? 'warning' : undefined"
+                      :leading-icon="itemHasWarning(item) ? 'i-lucide-triangle-alert' : undefined"
                       class="w-full"
                     />
                   </UFormField>
@@ -190,7 +203,14 @@
                   <!-- Card types: identity, glow, and previews -->
                   <template v-if="idKindOf(item.type) === 'card'">
                   <div class="flex min-w-0 flex-col gap-3">
-                    <UFormField label="卡牌ID"><CardSearchSelect v-model="item.cardId" :search="searchCards" :format="item.format" :resolve="batchedResolveCardNames" /></UFormField>
+                    <UFormField label="卡牌ID">
+                      <div class="flex items-center gap-1">
+                        <div class="min-w-0 flex-1">
+                          <CardSearchSelect v-model="item.cardId" :search="searchCards" :format="item.format" :resolve="batchedResolveCardNames" />
+                        </div>
+                        <UButton icon="i-lucide-list-plus" size="sm" variant="ghost" title="批量插入卡牌（按本条目配置）" @click="openBatchInsert(item)" />
+                      </div>
+                    </UFormField>
                     <UFormField label="关联卡牌">
                       <CardSearchSelect v-model="item.relatedCardsStr" multiple :search="searchCards" :format="item.format" :resolve="batchedResolveCardNames" placeholder="搜索并选择关联卡牌" />
                     </UFormField>
@@ -228,7 +248,7 @@
                     <div v-for="side in expectedSides(item.type)" :key="side" class="flex flex-col items-center gap-1">
                       <CardImage
                         class="w-32"
-                        :src="previewSrc(item._key, side)"
+                        :src="previewSrc(item, side)"
                         :card-id="item.cardId"
                         :version="form.version ?? 0"
                         :type="cardMetaOf(item)?.type ?? 'minion'"
@@ -329,11 +349,52 @@
       </template>
     </UModal>
 
+    <UModal v-model:open="batchInsertOpen" title="批量插入卡牌" class="sm:max-w-3xl">
+      <template #body>
+        <div class="space-y-4">
+          <p class="text-xs text-slate-600">
+            按当前条目配置插入：类型 <code class="rounded bg-slate-100 px-1">{{ batchTemplateType }}</code>，状态 <code class="rounded bg-slate-100 px-1">{{ batchTemplateStatus }}</code>，赛制 <code class="rounded bg-slate-100 px-1">{{ batchTemplateFormat }}</code>。插入到当前条目之后。
+          </p>
+          <div class="flex gap-4">
+            <div class="w-2/5">
+              <UFormField label="卡牌名称（每行一个）">
+                <UTextarea v-model="batchNames" :rows="10" class="h-full w-full" placeholder="每行一个卡牌名称，如：魔术师的高帽" @update:model-value="batchResolved = []" />
+              </UFormField>
+            </div>
+            <div class="min-w-0 flex-1">
+              <span class="text-sm font-medium text-slate-700">解析结果</span>
+              <div v-if="batchResolved.length > 0" class="mt-1 max-h-72 space-y-1 overflow-y-auto rounded border border-slate-200 p-1">
+                <div v-for="(row, idx) in batchResolved" :key="idx" class="flex items-center gap-2 rounded px-2 py-1.5 text-sm">
+                  <span class="w-32 shrink-0 truncate" :title="row.name">{{ row.name }}</span>
+                  <span v-if="row.candidates.length === 0" class="text-xs text-red-500">未找到</span>
+                  <USelect
+                    v-else
+                    :model-value="row.selected"
+                    :items="row.candidates.map(c => ({ label: `${c.cardId} · ${c.nameZh ?? c.nameEn ?? ''}`, value: c.cardId }))"
+                    class="min-w-0 flex-1"
+                    @update:model-value="row.selected = String($event)"
+                  />
+                </div>
+              </div>
+              <p v-else class="mt-1 text-xs text-slate-400">点击下方"解析"查看匹配结果</p>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton label="关闭" color="neutral" variant="ghost" @click="{ batchInsertOpen = false; }" />
+          <UButton label="解析" color="primary" variant="soft" :loading="batchResolving" :disabled="!batchNames.trim()" @click="resolveBatchNames" />
+          <UButton label="插入" color="primary" :loading="batchInserting" :disabled="insertableCount === 0" @click="confirmBatchInsert" />
+        </div>
+      </template>
+    </UModal>
+
     <UModal v-model:open="showRenderAllConfirm" title="确认写入全部图片" description="将重新渲染并写入所有卡图（覆盖已存在的图片）。此操作不可撤销。">
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" @click="showRenderAllConfirm = false" />
-          <UButton label="确认写入" color="error" @click="confirmRenderAll" />
+          <UButton label="取消" color="neutral" variant="ghost" @click="{ showRenderAllConfirm = false; }" />
+          <UButton label="确认写入" color="error" @click="{ confirmRenderAll(); }" />
         </div>
       </template>
     </UModal>
@@ -343,10 +404,10 @@
         <div class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <UFormField v-if="versionEditItem?.type === 'card_update'" label="对比版本">
-              <USelect :model-value="editLastVersion" :items="itemLastVersionOptions" class="w-full" @update:model-value="editLastVersion = $event" />
+              <USelect :model-value="editLastVersion" :items="itemLastVersionOptions" class="w-full" @update:model-value="{ editLastVersion = $event as any; }" />
             </UFormField>
             <UFormField label="版本">
-              <USelect :model-value="editVersion" :items="itemVersionOptions" class="w-full" @update:model-value="editVersion = $event" />
+              <USelect :model-value="editVersion" :items="itemVersionOptions" class="w-full" @update:model-value="{ editVersion = $event as any; }" />
             </UFormField>
           </div>
           <div v-if="versionEditItem?.type === 'card_update'" class="grid grid-cols-2 gap-4">
@@ -361,8 +422,8 @@
       </template>
       <template #footer>
         <div class="flex justify-end gap-2">
-          <UButton label="取消" color="neutral" variant="ghost" @click="versionEditKey = null" />
-          <UButton label="确定" color="primary" :disabled="!editDeltaValid" @click="applyItemVersionDelta" />
+          <UButton label="取消" color="neutral" variant="ghost" @click="{ versionEditKey = null; }" />
+          <UButton label="确定" color="primary" :disabled="!editDeltaValid" @click="{ applyItemVersionDelta(); }" />
         </div>
       </template>
     </UModal>
@@ -378,7 +439,8 @@ import { changeStatusByType, glowPart, group as groupEnum } from '#model/hearths
 import type { ChangeStatus, GameChangeType, GlowEntry } from '#model/hearthstone/schema/announcement';
 import type { RenderModel } from '#model/hearthstone/schema/entity';
 import { mergePreviews, selectPreview, type SidePreview } from '~/utils/announcement-preview';
-import { deriveGroup, idKindOf, serializeItems, type ParseError, type ParsedResult, type ResolvedCardName, type TextItem } from '~/utils/announcement-yaml';
+import { deriveGroup, idKindOf, serializeItems, type CardSearchResult, type ParseError, type ParsedResult, type ResolvedCardName, type TextItem } from '~/utils/announcement-yaml';
+import { isPoolFull } from '@tcg-cards/shared/hearthstone/pool';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import { useToast } from '@nuxt/ui/composables';
@@ -396,7 +458,7 @@ interface ItemDelta {
 }
 interface ItemForm {
   id?: string; _key: string; type: string; effectiveDate: string; format: string;
-  status: ChangeStatus; group: string; version?: number; lastVersion?: number;
+  status: ChangeStatus | 'unknown'; group: string; version?: number; lastVersion?: number;
   cardId: string; setId: string; ruleId: string; relatedCardsStr: string;
   delta: ItemDelta | null; glow: GlowEntry[] | null;
   /** Whether the group is auto-derived from format + card type (false once manually set). */
@@ -461,6 +523,24 @@ const renderAllColor = computed(() => {
 const showClearItemsModal = ref(false);
 const sortModalOpen = ref(false);
 const sortSnapshot = ref<ItemForm[]>([]);
+const batchInsertOpen = ref(false);
+const batchInserting = ref(false);
+const batchResolving = ref(false);
+const batchNames = ref('');
+/** Index of the item that acts as the batch template; -1 when none. */
+const batchInsertIndex = ref(-1);
+const batchTemplate = computed(() => (batchInsertIndex.value >= 0 ? form.items[batchInsertIndex.value] : null));
+const batchTemplateType = computed(() => batchTemplate.value?.type ?? '');
+const batchTemplateStatus = computed(() => batchTemplate.value?.status ?? '');
+const batchTemplateFormat = computed(() => batchTemplate.value?.format ? batchTemplate.value.format : '全部');
+/** One resolved card name with its candidate matches. */
+interface BatchResolvedItem {
+  name:       string;
+  candidates: CardSearchResult[];
+  selected:   string;
+}
+const batchResolved = ref<BatchResolvedItem[]>([]);
+const insertableCount = computed(() => batchResolved.value.filter(row => row.selected).length);
 /** Editor view: form editor, YAML text editor, or image-only gallery. */
 type EditorMode = 'form' | 'text' | 'image';
 const mode = ref<EditorMode>('form');
@@ -479,7 +559,7 @@ const requestingItems = reactive<Record<string, boolean>>({});
 const renderErrors = reactive<Record<string, string>>({});
 const renderedItems = reactive<Record<string, boolean>>({});
 const itemPreviews = reactive<Record<string, SidePreview[]>>({});
-const cardMetas = reactive<Record<string, { type: string, mechanics: Record<string, boolean | number>, name: string | null }>>({});
+const cardMetas = reactive<Record<string, { type: string, mechanics: Record<string, boolean | number>, name: string | null, isTimewarped: boolean }>>({});
 
 function expectedSides(type: string): string[] {
   if (type === 'card_change') return ['base'];
@@ -494,17 +574,21 @@ function findPreview(itemKey: string, side: string): SidePreview | undefined {
 /** Desktop runtime origin, matching the RPC client's http://localhost:4318/rpc. */
 const DESKTOP_IMAGE_BASE = 'http://localhost:4318';
 
+/** The premium mechanic tag marking a card as golden. */
+const PREMIUM_MECHANIC = '12';
+
 /** Builds the runtime image URL for a stored card image by render hash. */
-function buildImageUrl(hash: string, category: string, template: string): string {
-  return `${DESKTOP_IMAGE_BASE}/images/${category}/hand/${template}/normal/${hash.slice(0, 2)}/${hash}.webp?1`;
+function buildImageUrl(hash: string, category: string, template: string, premium: 'normal' | 'golden' = 'normal'): string {
+  return `${DESKTOP_IMAGE_BASE}/images/${category}/hand/${template}/${premium}/${hash.slice(0, 2)}/${hash}.webp?1`;
 }
 
 /** Resolves a preview side to a URL (storage) or data URL (transient render). */
-function previewSrc(itemKey: string, side: string): string | null {
-  const preview = findPreview(itemKey, side);
+function previewSrc(item: ItemForm, side: string): string | null {
+  const preview = findPreview(item._key, side);
   if (!preview) return null;
   if (preview.source === 'storage' && preview.hash) {
-    return buildImageUrl(preview.hash, preview.category, preview.template);
+    const premium = cardMetaOf(item)?.mechanics?.[PREMIUM_MECHANIC] ? 'golden' : 'normal';
+    return buildImageUrl(preview.hash, preview.category, preview.template, premium);
   }
   return `data:${preview.mimeType ?? 'image/webp'};base64,${preview.base64}`;
 }
@@ -892,6 +976,9 @@ async function computeGlow(item: ItemForm, options: { silent?: boolean, replace?
     }
     if (replace) item.glow = sortGlowEntries(glow);
     else mergeGlow(item, glow);
+    if (item.type === 'card_update' && item.status === 'unknown') {
+      item.status = deriveStatusFromGlow(item.glow ?? []);
+    }
   } catch (error) {
     if (!silent) showToast('计算高亮失败', error instanceof Error ? error.message : String(error), 'error');
   } finally {
@@ -916,6 +1003,15 @@ function mergeGlow(item: ItemForm, computed: GlowEntry[]) {
     else byPart.set(entry.part, { part: entry.part, type: entry.type });
   }
   item.glow = sortGlowEntries([...byPart.values()]);
+}
+
+/** Derives an overall status from glow entries for the card_update 'unknown' placeholder. */
+function deriveStatusFromGlow(glow: GlowEntry[]): ChangeStatus {
+  const types = glow.map(entry => entry.type);
+  if (types.every(t => t === 'nerf')) return 'nerf';
+  if (types.every(t => t === 'buff')) return 'buff';
+  if (types.includes('rework') || types.includes('neutral')) return 'rework';
+  return 'tweak';
 }
 
 /** Lists fixed glow parts while preventing duplicate selections within an item. */
@@ -995,15 +1091,16 @@ watch(
 // Auto-fills the announcement group from format + card type until it is manually set.
 watch(
   () => form.items.map(item => ({
-    key:    item._key,
-    format: item.format,
-    type:   cardMetaOf(item)?.type ?? null,
+    key:          item._key,
+    format:       item.format,
+    type:         cardMetaOf(item)?.type ?? null,
+    isTimewarped: cardMetaOf(item)?.isTimewarped ?? false,
   })),
   entries => {
     for (const entry of entries) {
       const item = form.items.find(it => it._key === entry.key);
       if (!item || item._groupAuto === false) continue;
-      const derived = deriveGroup(entry.format, entry.type);
+      const derived = deriveGroup(entry.format, entry.type, entry.isTimewarped);
       if (derived && item.group !== derived) item.group = derived;
     }
   },
@@ -1019,7 +1116,7 @@ const sourceOptions = [
 ];
 
 const sourceLabels: Record<string, string> = {
-  blizzard: 'Blizzard', 'blizzard-cn': '国服', release: '系列发售', hotfix: '热修',
+  'blizzard': 'Blizzard', 'blizzard-cn': '国服', 'release': '系列发售', 'hotfix': '热修',
 };
 
 function sourceLabel(source: string): string {
@@ -1034,12 +1131,13 @@ const itemTypeOptions = [
 
 const formatOptions = [
   { label: '全部格式', value: '__all__' },
+  { label: '构筑 constructed', value: 'constructed' },
   { label: '标准 standard', value: 'standard' },
   { label: '狂野 wild', value: 'wild' },
-  { label: '构筑 constructed', value: 'constructed' },
+  { label: '战棋 battlegrounds', value: 'battlegrounds' },
+  { label: '竞技场 arena', value: 'arena' },
   { label: '幻变 twist', value: 'twist' },
   { label: '佣兵 mercenaries', value: 'mercenaries' },
-  { label: '战棋 battlegrounds', value: 'battlegrounds' },
 ];
 
 const GROUP_LABELS: Record<string, string> = {
@@ -1049,6 +1147,7 @@ const GROUP_LABELS: Record<string, string> = {
   bg_trinket:      '战棋饰品',
   bg_tavern_spell: '战棋酒馆法术',
   bg_anomaly:      '战棋畸变',
+  bg_timewarped:   '战棋时空扭曲',
 };
 
 const groupOptions = [
@@ -1200,6 +1299,11 @@ function statusGlowConflict(item: ItemForm): boolean {
   if (allNumericParts && allDirectional && status === 'rework') return true;
 
   return false;
+}
+
+/** True when the item carries a status that needs attention (conflict or unresolved 'unknown'). */
+function itemHasWarning(item: ItemForm): boolean {
+  return item.status === 'unknown' || statusGlowConflict(item);
 }
 
 const toast = useToast();
@@ -1554,6 +1658,85 @@ function setEditorMode(value: unknown) {
   if (next === 'image' || (next === 'form' && wasText)) void loadExistingImages();
 }
 
+/** Switches to form mode and expands the given item for immediate editing. */
+function jumpToItem(item: ItemForm) {
+  setEditorMode('form');
+  expandedKey.value = item._key;
+}
+
+/** Opens the batch-insert modal using the given item as the config template. */
+function openBatchInsert(item: ItemForm) {
+  batchInsertIndex.value = form.items.indexOf(item);
+  batchNames.value = '';
+  batchResolved.value = [];
+  batchInsertOpen.value = true;
+}
+
+/** Builds a new item that clones the template's config but targets one card. */
+function batchItemFrom(template: ItemForm, cardId: string): ItemForm {
+  return {
+    ...emptyItem(),
+    type:          template.type,
+    status:        template.status,
+    format:        template.format,
+    group:         template.group,
+    version:       template.version,
+    lastVersion:   template.lastVersion,
+    effectiveDate: template.effectiveDate,
+    cardId,
+    _groupAuto:    template._groupAuto,
+  };
+}
+
+/** Resolves the pasted names into a selectable candidate preview; nothing is inserted yet. */
+async function resolveBatchNames() {
+  const index = batchInsertIndex.value;
+  const template = index >= 0 ? form.items[index] : null;
+  if (!template) return;
+  const names = batchNames.value.split('\n').map(name => name.trim()).filter(Boolean);
+  batchResolving.value = true;
+  try {
+    const rows: BatchResolvedItem[] = [];
+    for (const name of names) {
+      const candidates = await searchCards(name, template.format || undefined);
+      rows.push({ name, candidates, selected: candidates[0]?.cardId ?? '' });
+    }
+    batchResolved.value = rows;
+  } finally {
+    batchResolving.value = false;
+  }
+}
+
+/** Inserts the rows confirmed in the modal after the template item. */
+async function confirmBatchInsert() {
+  const index = batchInsertIndex.value;
+  const template = index >= 0 ? form.items[index] : null;
+  if (!template) return;
+  const selected = batchResolved.value
+    .map(row => row.selected)
+    .filter((cardId): cardId is string => !!cardId);
+  if (selected.length === 0) return;
+  batchInserting.value = true;
+  try {
+    // The template itself fills the first selected card when it has none.
+    const newItems: ItemForm[] = [];
+    if (!template.cardId) {
+      template.cardId = selected[0]!;
+      for (const cardId of selected.slice(1)) newItems.push(batchItemFrom(template, cardId));
+    } else {
+      for (const cardId of selected) newItems.push(batchItemFrom(template, cardId));
+    }
+    if (newItems.length > 0) form.items.splice(index + 1, 0, ...newItems);
+    const skipped = batchResolved.value.filter(row => !row.selected).length;
+    showToast(`已插入 ${selected.length} 条${skipped > 0 ? `，跳过 ${skipped} 条` : ''}`, '', 'success');
+    batchInsertOpen.value = false;
+    batchResolved.value = [];
+    batchNames.value = '';
+  } finally {
+    batchInserting.value = false;
+  }
+}
+
 function openSortModal() {
   sortSnapshot.value = form.items.slice();
   for (const item of form.items) {
@@ -1727,7 +1910,72 @@ async function saveAnnouncement(): Promise<string | null> {
   }
 }
 
+/** Scoped pool key of an item: (format, group); set pools ignore group. */
+function poolScopeKey(item: ItemForm): string {
+  const group = item.type === 'set_change' ? '' : item.group;
+  return `${item.format}|${group}`;
+}
+
+/** True when an item is a pool-rotation full marker (`#full`). */
+function isPoolClearItem(item: ItemForm): boolean {
+  return (item.type === 'set_change' && isPoolFull(item.setId))
+    || (item.type === 'card_change' && isPoolFull(item.cardId));
+}
+
+/** Validates pool-rotation usage across items; returns warning messages. */
+function validatePoolRotations(items: ItemForm[]): string[] {
+  const warnings: string[] = [];
+  const rotationScopes = new Set<string>();
+  for (const item of items) {
+    if (isPoolClearItem(item)) rotationScopes.add(poolScopeKey(item));
+  }
+
+  const seenClear = new Set<string>();
+  items.forEach((item, index) => {
+    if (isPoolClearItem(item)) {
+      if (!item.format) warnings.push(`条目 ${index + 1}：#full 缺少 format`);
+      if (item.status !== 'unavailable') {
+        warnings.push(`条目 ${index + 1}：#full 的 status 必须为 unavailable`);
+      }
+      if (item.type === 'card_change' && !item.group) {
+        warnings.push(`条目 ${index + 1}：card_change 的 #full 必须带 group`);
+      }
+      if (!item.format) return;
+      const scope = poolScopeKey(item);
+      if (seenClear.has(scope)) warnings.push(`条目 ${index + 1}：同一池子出现多次 #full`);
+      else seenClear.add(scope);
+    } else if ((item.type === 'set_change' || item.type === 'card_change') && item.format) {
+      const scope = poolScopeKey(item);
+      if (rotationScopes.has(scope) && !seenClear.has(scope)) {
+        warnings.push(`条目 ${index + 1}：${item.type} 出现在 #full 之前`);
+      }
+    }
+  });
+  return warnings;
+}
+
+/** Warns when a card_update delta sets a curr-side cardId (it is ignored). */
+function validateCurrCardId(items: ItemForm[]): string[] {
+  const warnings: string[] = [];
+  items.forEach((item, index) => {
+    if (item.type === 'card_update' && item.delta?.curr?.cardId) {
+      warnings.push(`条目 ${index + 1}：delta.curr.cardId 会被忽略（当前卡为条目 cardId）`);
+    }
+  });
+  return warnings;
+}
+
 async function handleSubmit() {
+  // Pool-rotation usage and curr-cardId overrides are checked before saving.
+  const warnings = [...validatePoolRotations(form.items), ...validateCurrCardId(form.items)];
+  if (warnings.length > 0 && !confirm(`公告校验警告：\n${warnings.join('\n')}\n\n仍要保存吗？`)) {
+    return;
+  }
+  // Save the editor mode and the expanded item so they survive the reload.
+  const prevMode = mode.value;
+  const expandedIndex = expandedKey.value
+    ? form.items.findIndex(item => item._key === expandedKey.value)
+    : -1;
   try {
     const nextId = await saveAnnouncement();
     if (nextId == null) return;
@@ -1737,6 +1985,12 @@ async function handleSubmit() {
     selectedId.value = nextId;
     isCreating.value = false;
     await loadDetail(nextId);
+    // Restore the editor mode (and re-serialize text when applicable).
+    setEditorMode(prevMode);
+    // Items keep their order after reload, so re-expand the saved index.
+    if (expandedIndex >= 0 && form.items[expandedIndex]) {
+      expandedKey.value = form.items[expandedIndex]._key;
+    }
   } catch (e: any) {
     showToast('保存失败', e.message, 'error');
   }
