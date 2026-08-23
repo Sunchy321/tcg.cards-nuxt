@@ -149,6 +149,9 @@
                   <span class="truncate text-sm font-medium">{{ tileTitle(item) }}</span>
                   <span v-if="item.cardId || item.setId || item.ruleId" class="shrink-0 text-xs text-slate-500">{{ item.cardId || item.setId || item.ruleId }}</span>
                   <span class="ml-auto flex shrink-0 items-center gap-2">
+                    <span v-if="idKindOf(item.type) === 'card' && itemEditState(item) !== 'none'" class="shrink-0" :title="versionDeltaTooltip(item)">
+                      <UIcon name="i-lucide-tag" class="size-3.5" :class="itemEditState(item) === 'delta' ? 'text-amber-500' : 'text-primary-500'" />
+                    </span>
                     <span v-if="item.status" class="text-xs text-slate-600">{{ item.status }}</span>
                     <span v-if="item.format" class="text-xs text-slate-500">{{ item.format }}</span>
                     <span v-if="item.group" class="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-200">{{ groupLabel(item.group) }}</span>
@@ -233,6 +236,7 @@
                     </div>
                   </div>
                   <div class="col-span-2 flex flex-wrap items-center gap-1">
+                    <UButton icon="i-lucide-tag" label="版本" size="xs" variant="ghost" :color="itemEditColor(item)" @click="openItemVersionDelta(item._key)" />
                     <UButton icon="i-lucide-eye" label="预览" size="xs" variant="ghost" :loading="previewingItems[item._key]" :disabled="!form.version || !item.cardId" @click="handlePreviewItem(index)" />
                     <UButton icon="i-lucide-download" label="下载 PNG" size="xs" variant="ghost" :loading="downloadingItems[item._key]" :disabled="!form.version || !item.cardId" @click="handleDownloadPng(index)" />
                     <UButton v-if="renderLang === 'all'" icon="i-lucide-file-json" label="下载请求" size="xs" variant="ghost" :loading="requestingItems[item._key]" :disabled="!form.version || !item.cardId" @click="handleRequest(item)" />
@@ -327,6 +331,35 @@
         </div>
       </template>
     </UModal>
+
+    <UModal v-model:open="versionEditModalOpen" title="编辑条目" class="sm:max-w-5xl">
+      <template #body>
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <UFormField v-if="versionEditItem?.type === 'card_update'" label="对比版本">
+              <USelect :model-value="editLastVersion" :items="itemLastVersionOptions" class="w-full" @update:model-value="editLastVersion = $event" />
+            </UFormField>
+            <UFormField label="版本">
+              <USelect :model-value="editVersion" :items="itemVersionOptions" class="w-full" @update:model-value="editVersion = $event" />
+            </UFormField>
+          </div>
+          <div v-if="versionEditItem?.type === 'card_update'" class="grid grid-cols-2 gap-4">
+            <UFormField label="修正 prev">
+              <YamlEditor v-model="editDeltaPrev" height="320px" />
+            </UFormField>
+            <UFormField label="修正 curr">
+              <YamlEditor v-model="editDeltaCurr" height="320px" />
+            </UFormField>
+          </div>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton label="取消" color="neutral" variant="ghost" @click="versionEditKey = null" />
+          <UButton label="确定" color="primary" :disabled="!editDeltaValid" @click="applyItemVersionDelta" />
+        </div>
+      </template>
+    </UModal>
   </div>
 </template>
 
@@ -340,6 +373,7 @@ import type { ChangeStatus, GameChangeType, GlowEntry } from '#model/hearthstone
 import type { RenderModel } from '#model/hearthstone/schema/entity';
 import { mergePreviews, selectPreview, type SidePreview } from '~/utils/announcement-preview';
 import { deriveGroup, idKindOf, serializeItems, type ParseError, type ParsedResult, type ResolvedCardName, type TextItem } from '~/utils/announcement-yaml';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import { useToast } from '@nuxt/ui/composables';
 import type { Locale } from '@tcg-cards/model/hearthstone/schema/basic';
@@ -1015,6 +1049,99 @@ function handleTypeChange(item: ItemForm, value: unknown) {
   if (!config) return;
   if (item.status && !config.statuses.includes(item.status as ChangeStatus)) {
     item.status = config.default ?? 'buff';
+  }
+}
+
+// ----- Item version / delta editing -----
+
+/** Item key whose version/delta edit modal is open; null when closed. */
+const versionEditKey = ref<string | null>(null);
+const editVersion = ref<number | 'inherit'>('inherit');
+const editLastVersion = ref<number | 'inherit' | 'same'>('inherit');
+const editDeltaPrev = ref('');
+const editDeltaCurr = ref('');
+const editDeltaValid = computed(() => isDeltaSideValid(editDeltaPrev.value) && isDeltaSideValid(editDeltaCurr.value));
+
+const versionEditItem = computed(() => form.items.find(i => i._key === versionEditKey.value) ?? null);
+const versionEditModalOpen = computed({
+  get: () => versionEditKey.value != null,
+  set: (v: boolean) => { if (!v) versionEditKey.value = null; },
+});
+
+/** Version dropdown options for an item (inherit the announcement version, or a specific patch). */
+const itemVersionOptions = computed(() => [{ label: '继承公告', value: 'inherit' }, ...patchOptions.value]);
+/** Last-version dropdown options for an item (inherit, same as its version, or a specific patch). */
+const itemLastVersionOptions = computed(() => [
+  { label: '继承公告', value: 'inherit' },
+  { label: '与版本相同', value: 'same' },
+  ...patchOptions.value,
+]);
+
+/** Version/delta edit state of an item: none, version override, or delta set. */
+function itemEditState(item: ItemForm): 'none' | 'version' | 'delta' {
+  if (item.delta && Object.keys(item.delta).length > 0) return 'delta';
+  if (item.version != null || item.lastVersion != null) return 'version';
+  return 'none';
+}
+
+function itemEditColor(item: ItemForm): 'neutral' | 'primary' | 'warning' {
+  return itemEditState(item) === 'delta' ? 'warning' : itemEditState(item) === 'version' ? 'primary' : 'neutral';
+}
+
+function versionDeltaTooltip(item: ItemForm): string {
+  const parts: string[] = [];
+  if (item.version != null) parts.push(`版本 ${item.version}`);
+  if (item.lastVersion != null) parts.push(`对比 ${item.lastVersion}`);
+  if (item.delta && Object.keys(item.delta).length > 0) parts.push('含 delta');
+  return parts.join(' · ') || '含修正';
+}
+
+/** Opens the version/delta edit modal for one item. */
+function openItemVersionDelta(key: string) {
+  const item = form.items.find(i => i._key === key);
+  if (!item) return;
+  editVersion.value = item.version ?? 'inherit';
+  editLastVersion.value = item.lastVersion ?? 'inherit';
+  editDeltaPrev.value = item.delta?.prev ? stringifyYaml(item.delta.prev) : '';
+  editDeltaCurr.value = item.delta?.curr ? stringifyYaml(item.delta.curr) : '';
+  versionEditKey.value = key;
+}
+
+/** Applies the edited version/lastVersion/delta to the item. */
+function applyItemVersionDelta() {
+  const item = versionEditItem.value;
+  if (!item) return;
+  item.version = editVersion.value === 'inherit' ? undefined : editVersion.value;
+  if (editLastVersion.value === 'inherit') item.lastVersion = undefined;
+  else if (editLastVersion.value === 'same') item.lastVersion = item.version ?? undefined;
+  else item.lastVersion = editLastVersion.value;
+  if (editDeltaValid.value) {
+    const delta: ItemDelta = {};
+    const prev = parseDeltaSide(editDeltaPrev.value) as Partial<RenderModel> | null;
+    const curr = parseDeltaSide(editDeltaCurr.value) as Partial<RenderModel> | null;
+    if (prev) delta.prev = prev;
+    if (curr) delta.curr = curr;
+    item.delta = Object.keys(delta).length > 0 ? delta : null;
+  }
+  versionEditKey.value = null;
+}
+
+/** Parses one delta side as YAML; null when empty/whitespace (the field is omitted). */
+function parseDeltaSide(text: string): unknown | null {
+  const t = text.trim();
+  if (!t) return null;
+  return parseYaml(t);
+}
+
+/** True when one delta side's YAML is empty or parses cleanly. */
+function isDeltaSideValid(text: string): boolean {
+  const t = text.trim();
+  if (!t) return true;
+  try {
+    parseYaml(t);
+    return true;
+  } catch {
+    return false;
   }
 }
 
