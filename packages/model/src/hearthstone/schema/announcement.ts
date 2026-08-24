@@ -108,6 +108,7 @@ export const group = z.enum([
   'bg_tavern_spell',
   'bg_anomaly',
   'bg_timewarped',
+  'bg_dm_prize',
   'quest',
   'c_thun',
   'hero',

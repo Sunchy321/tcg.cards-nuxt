@@ -1149,6 +1149,7 @@ const GROUP_LABELS: Record<string, string> = {
   bg_tavern_spell: '战棋酒馆法术',
   bg_anomaly:      '战棋畸变',
   bg_timewarped:   '战棋时空扭曲',
+  bg_dm_prize:     '战棋暗月奖品',
 };
 
 const groupOptions = [
