@@ -1100,7 +1100,9 @@ watch(
   entries => {
     for (const entry of entries) {
       const item = form.items.find(it => it._key === entry.key);
-      if (!item || item._groupAuto === false) continue;
+      // A manually-special group like bg_dm_prize (not derivable from card type)
+      // must survive auto-alignment regardless of the _groupAuto flag.
+      if (!item || item._groupAuto === false || item.group === 'bg_dm_prize') continue;
       const derived = deriveGroup(entry.format, entry.type, entry.isTimewarped);
       if (derived && item.group !== derived) item.group = derived;
     }
@@ -1349,6 +1351,7 @@ function fillForm(row: any) {
     cardId:          i.cardId ?? '', setId:           i.setId ?? '', ruleId:          i.ruleId ?? '',
     relatedCardsStr: Array.isArray(i.relatedCards) ? i.relatedCards.join(', ') : '',
     delta:           i.delta ?? null, glow:            i.glow ?? null,
+    _groupAuto:      !i.group,
   }));
   isCreating.value = false;
   mode.value = 'form';
