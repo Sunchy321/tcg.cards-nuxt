@@ -1,4 +1,4 @@
-import type { ImageRequirementRequest } from '@tcg-cards/model/hearthstone/schema/data/image';
+import type { ImageRequirementRequest, ImageRequestOverride } from '@tcg-cards/model/hearthstone/schema/data/image';
 import type { RenderModel } from '@tcg-cards/model/hearthstone/schema/entity';
 import { CardImageAsset } from '@tcg-cards/db/schema/shared/hearthstone/card-image';
 import { Entity, EntityLocalization } from '@tcg-cards/db/schema/local/hearthstone';
@@ -18,6 +18,15 @@ import { locale, type Locale } from '#model/hearthstone/schema/basic';
 
 // ----- Types -----
 
+/** Per-side render-model correction; `override` is routed to the render request, not the render model. */
+export type RenderSideDelta = Partial<RenderModel> & { override?: ImageRequestOverride };
+
+/** Per-side render corrections for one announcement item. */
+export interface RenderItemDelta {
+  prev?: RenderSideDelta;
+  curr?: RenderSideDelta;
+}
+
 export interface RenderSideInput {
   itemKey:     string;
   side:        'base' | 'prev' | 'curr';
@@ -25,7 +34,7 @@ export interface RenderSideInput {
   buildNumber: number;
   lang:        Locale;
   format:      string | null;
-  delta?:      Partial<RenderModel>;
+  delta?:      RenderSideDelta;
   glow?:       GlowEntry[] | null;
 }
 
@@ -153,9 +162,10 @@ async function fetchSideRenderModelRows(cardIds: string[], langs: Locale[]): Pro
 
 // ----- Render model assembly -----
 
-function mergeDeltaOnto(model: RenderModel, delta?: Partial<RenderModel>): RenderModel {
+function mergeDeltaOnto(model: RenderModel, delta?: RenderSideDelta): RenderModel {
   if (!delta) return model;
-  return { ...model, ...delta };
+  const { override: _override, ...rest } = delta;
+  return { ...model, ...rest };
 }
 
 function applyGlow(model: RenderModel, glow?: GlowEntry[] | null): RenderModel {
@@ -181,6 +191,7 @@ function buildRenderRequest(
   template: string,
   category: 'base' | 'glow',
   r2Bucket: string,
+  override?: ImageRequestOverride,
 ): ImageRequirementRequest {
   const mechanics = resolved.mechanics ?? {};
   const variant = {
@@ -204,7 +215,7 @@ function buildRenderRequest(
     mechanics,
   };
 
-  return buildRequest(candidate, variant, r2Bucket);
+  return buildRequest(candidate, variant, r2Bucket, override);
 }
 
 /** Resolves one announcement side and builds the same request used by the image workflow. */
@@ -232,6 +243,7 @@ export async function prepareSingleSide(input: RenderSideInput): Promise<Prepare
     resolveTemplate(input.format),
     category,
     'hearthstone-card-images',
+    input.delta?.override,
   );
 
   return { itemKey: input.itemKey, side: input.side, lang: input.lang, cardId: input.cardId, request };
@@ -356,7 +368,7 @@ export interface RenderItemLike {
   format:       string | null;
   version?:     number | null;
   lastVersion?: number | null;
-  delta?:       { prev?: Partial<RenderModel>, curr?: Partial<RenderModel> } | null;
+  delta?:       RenderItemDelta | null;
   glow?:        GlowEntry[] | null;
 }
 
@@ -426,7 +438,7 @@ export async function prepareItemRequests(
     format:       string | null;
     version?:     number | null;
     lastVersion?: number | null;
-    delta?:       { prev?: Partial<RenderModel>, curr?: Partial<RenderModel> } | null;
+    delta?:       RenderItemDelta | null;
     glow?:        GlowEntry[] | null;
   },
   announcement: { version: number, lastVersion?: number | null },
@@ -488,7 +500,7 @@ export async function checkItemImages(
     format:       string | null;
     version?:     number | null;
     lastVersion?: number | null;
-    delta?:       { prev?: Partial<RenderModel>, curr?: Partial<RenderModel> } | null;
+    delta?:       RenderItemDelta | null;
     glow?:        GlowEntry[] | null;
   }>,
   announcement: { version: number, lastVersion?: number | null },
@@ -503,7 +515,11 @@ export async function checkItemImages(
 
   // Resolve every needed render model in ONE query, then filter by build number
   // in memory. The old per-side queries made large announcements very slow.
-  const distinctCardIds = [...new Set(items.map(item => item.cardId).filter((id): id is string => !!id))];
+  // The prev side may compare against a different card via delta.prev.cardId,
+  // so include that card's rows too.
+  const distinctCardIds = [...new Set(
+    items.flatMap(item => [item.cardId, item.delta?.prev?.cardId]).filter((id): id is string => !!id),
+  )];
   const rows = await fetchSideRenderModelRows(distinctCardIds, [...new Set(langsOrDefault)]);
 
   const rowsByCardLang = new Map<string, SideRenderModelRow[]>();
@@ -527,6 +543,7 @@ export async function checkItemImages(
       localizationHash: row.localizationHash,
       version:          row.entityVersion,
       setDbfId:         row.setDbfId ?? 0,
+      mechanics:        row.mechanics ?? {},
     };
   };
 
@@ -581,7 +598,7 @@ export async function renderAllItems(
     format:       string | null;
     version?:     number | null;
     lastVersion?: number | null;
-    delta?:       { prev?: Partial<RenderModel>, curr?: Partial<RenderModel> } | null;
+    delta?:       RenderItemDelta | null;
     glow?:        GlowEntry[] | null;
   }>,
   announcement: { version: number, lastVersion?: number | null },

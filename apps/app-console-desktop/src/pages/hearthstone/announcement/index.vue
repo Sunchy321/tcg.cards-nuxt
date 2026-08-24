@@ -437,6 +437,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { VueDraggable } from 'vue-draggable-plus';
 import { changeStatusByType, glowPart, group as groupEnum } from '#model/hearthstone/schema/announcement';
 import type { ChangeStatus, GameChangeType, GlowEntry } from '#model/hearthstone/schema/announcement';
+import type { ImageRequestOverride } from '#model/hearthstone/schema/data/image';
 import type { RenderModel } from '#model/hearthstone/schema/entity';
 import { mergePreviews, selectPreview, type SidePreview } from '~/utils/announcement-preview';
 import { deriveGroup, idKindOf, serializeItems, type CardSearchResult, type ParseError, type ParsedResult, type ResolvedCardName, type TextItem } from '~/utils/announcement-yaml';
@@ -453,8 +454,9 @@ const client = useDesktopRuntimeClient();
 interface LinkEntry { url: string, label?: string, _parsing?: boolean }
 /** Stores display-only render model corrections for both sides of an item. */
 interface ItemDelta {
-  prev?: Partial<RenderModel>;
-  curr?: Partial<RenderModel>;
+  /** `override` is routed to the render request's override, not merged into the render model. */
+  prev?: Partial<RenderModel> & { override?: ImageRequestOverride };
+  curr?: Partial<RenderModel> & { override?: ImageRequestOverride };
 }
 interface ItemForm {
   id?: string; _key: string; type: string; effectiveDate: string; format: string;
@@ -787,7 +789,6 @@ async function handleRenderItem(index: number) {
     // Persist the current announcement before writing the image.
     if (await saveAnnouncement() == null) return;
     const langs = renderLang.value === 'all' ? [] : [renderLang.value];
-    console.log('[render] calling renderItems', { cardId: item.cardId, version: form.version, langs });
     const res: any = await client.hearthstone.announcement.renderItems({
       items: [{
         itemKey, type:        item.type, cardId:      item.cardId, format:      item.format,

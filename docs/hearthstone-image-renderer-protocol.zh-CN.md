@@ -81,7 +81,7 @@
 - 输出宽高
 - `renderModel`
 
-对于 `partial-update`，渲染器还会消费 `card`，用它从内部游戏数据中定位基础状态。`card.cardId` 与 `renderModel.cardId` 必须指向同一张卡牌。
+渲染器在每次渲染中解析基卡（见"基卡解析"）：提供 `override` 时使用显式的 `override.cardId`，否则目标卡 `renderModel.cardId`，否则默认模板卡。目标卡（即正在渲染的卡牌）由 `renderModel.cardId` 标识。`card` 对象仅作为标识被接受，渲染器不校验、不消费它。
 
 当前请求体中，渲染器直接依赖的字段是：
 
@@ -92,7 +92,7 @@
 - `renderModel`
   用于生成卡图的 canonical render-model 载荷。
 
-`requestId`、`style`、`target`、`output.fileName`、`output.format` 和 `output.transparentBackground` 是必填的任务元数据。它们用于结果关联、校验、导入和存储，但渲染器生成像素时不消费这些字段。
+`requestId`、`target`、`output.fileName`、`output.format` 和 `output.transparentBackground` 是必填的任务元数据。它们用于结果关联、校验、导入和存储，但渲染器生成像素时不消费这些字段。
 
 本规范定义的接口只接收单个渲染请求对象，不接收批量 wrapper 文档。
 
@@ -104,9 +104,10 @@
 
 完整任务对象是必填的，但渲染器生成 PNG 时只消费其中一部分：
 
-- **每次渲染都消费**：`variant`、`renderMode`、`output.width`、`output.height` 和 `renderModel`。
-- **`partial-update` 额外消费**：`card.cardId` 和 `card.lang`，用于从渲染器内部游戏数据加载基础状态。
-- **必填但不参与像素生成的任务元数据**：`requestId`、`style`、`target`、`output.fileName`、`output.format` 和 `output.transparentBackground`。
+- **每次渲染都消费**：`variant`、`renderMode`、`output.width`、`output.height` 与 `renderModel`。
+- **提供时消费**：`override`（可选的 `override.cardId` 基卡控制项与可选的 `override.portraitImage` 覆盖）。
+- **仅作为标识被接受，不消费**：`card`（`card.cardId`、`card.lang`）。
+- **必填但不参与像素生成的任务元数据**：`requestId`、`target`、`output.fileName`、`output.format` 和 `output.transparentBackground`。
 
 不参与像素生成的字段仍然必填，因为同一个对象还会继续用于结果关联和导出/导入流程。
 
@@ -119,6 +120,9 @@
     "cardId": "ABC_123",
     "lang": "zhs"
   },
+  "override": {
+    "cardId": "ABC_123"
+  },
   "variant": {
     "category": "glow",
     "zone": "hand",
@@ -126,17 +130,6 @@
     "premium": "normal"
   },
   "renderMode": "full-set",
-  "style": {
-    "styleKey": "hand_normal_normal_default",
-    "category": "glow",
-    "zone": "hand",
-    "template": "normal",
-    "premium": "normal",
-    "layout": "default",
-    "width": 512,
-    "height": 768,
-    "transparentBackground": false
-  },
   "output": {
     "fileName": "9ca666539f9e4b7746527ed13cf4d5cda4a79c9126fcd8781ac1c89a38e7841c.png",
     "format": "png",
@@ -176,6 +169,8 @@
 }
 ```
 
+上例中 `override.cardId` 与 `renderModel.cardId` 相同，因此渲染器将目标卡解析为基卡。当渲染游戏数据中已不存在的卡牌时，将 `renderModel.cardId` 设为目标卡（正在渲染的卡牌），并将 `override.cardId` 设为游戏数据中真实存在的一张卡（或省略 `override.cardId` 以回退到目标卡或默认模板卡）；见"基卡解析"。
+
 ### 字段参考
 
 #### `requestId`
@@ -188,12 +183,41 @@
 #### `card`
 
 - **类型**：`object`
-- **必填**：是。渲染器在 `partial-update` 中使用该对象定位内部游戏数据。
+- **必填**：是
+
+仅作为标识被接受。渲染器不校验、不消费该对象；它仅用于调用方侧标识与兼容性。驱动渲染的字段是 `override` 与 `renderModel`。
 
 | 字段 | 类型 | 说明 |
 |-------|------|-------------|
-| `cardId` | `string` | 卡牌标识 |
-| `lang` | `string` | 语言代码（如 `zhs`、`enus`） |
+| `cardId` | `string` | 卡牌标识（仅信息用途） |
+| `lang` | `string` | 语言代码（仅信息用途） |
+
+#### `override`
+
+- **类型**：`object`
+- **必填**：否
+
+渲染数据源控制。`cardId` 字段选择由哪张卡提供基础状态与渲染骨架，`portraitImage` 字段用外部图片覆盖基卡的卡面图。目标卡（即正在渲染的卡牌）由 `renderModel.cardId` 标识。省略 `override` 时，基卡解析为目标卡或默认模板卡。
+
+| 字段 | 类型 | 说明 |
+|-------|------|-------------|
+| `cardId` | `string?` | 基卡标识。提供时，渲染器使用该卡的数据作为基础状态与渲染骨架，而非目标卡。省略时自动解析基卡（见下方"基卡解析"）。 |
+| `portraitImage` | `string?` | Base64 编码的 PNG 插画，用于覆盖基卡的卡面图。见下方"插画解析"。 |
+
+##### 基卡解析
+
+基卡提供渲染骨架：Actor prefab、由 CardDef 驱动的材质（卡框、稀有度宝石、职业徽章、默认卡面图），以及在 `partial-update` 下的基础字段值。渲染器按如下顺序解析基卡：
+
+1. 提供 `cardId` 时，使用该卡作为基卡。若该卡不在渲染器的游戏数据中，返回 `422`。
+2. 否则，若目标卡 `renderModel.cardId` 能解析到游戏数据，使用目标卡。
+3. 否则，按 `renderModel.type` 选择默认模板卡（复用 placeholder 渲染的模板卡选择逻辑）。若 `renderModel.type` 缺失，返回 `422`。
+
+所有显示字段都会被 `renderModel` 覆盖到基卡之上。只有当 `renderMode` 语义保留了基卡的字段值（即 `renderModel` 未提供该字段）时，基卡的字段值才会显示。
+
+##### 插画解析
+
+1. 提供 `portraitImage` 时，渲染器解码 base64 PNG 并注入为卡面图。仅支持 `normal` 与 `golden` 品质。`portraitImage` 与 `diamond` 或 `signature` 品质组合时返回 `422`。
+2. 否则，使用基卡 CardDef 的卡面图，支持所有品质。
 
 #### `variant`
 
@@ -219,30 +243,13 @@
 | 值 | 基础状态 | 可选字段缺失 |
 |----|---------|-------------|
 | `"full-set"` | 无 | 该字段不适用或被清除 |
-| `"partial-update"` | 使用 `card` 从内部游戏数据加载 | 保留基础状态中的值 |
+| `"partial-update"` | 从解析后的基卡解析（见"基卡解析"） | 保留基础状态中的值 |
 
-当为 `"partial-update"` 时，渲染器先使用 `card` 从内部游戏数据解析基础 render model，再用 `renderModel` 中明确出现的字段覆盖它。缺失的可选字段保留基础状态中的值。
+当为 `"partial-update"` 时，渲染器先从解析后的基卡解析基础状态，再用 `renderModel` 中明确出现的字段覆盖它。缺失的可选字段保留基础状态中的值。
 
 当为 `"full-set"` 时，`renderModel` 是完整的规范快照；不适用于该卡牌的可选字段仍可缺失。
 
-#### `style`
-
-- **类型**：`object`
-- **必填**：是（任务元数据，不参与像素生成）
-
-导出/导入流程使用的渲染样式声明。渲染器不消费。
-
-| 字段 | 类型 | 说明 |
-|-------|------|-------------|
-| `styleKey` | `string` | 样式标识 |
-| `category` | `string` | 同 `variant.category` |
-| `zone` | `string` | 同 `variant.zone` |
-| `template` | `string` | 同 `variant.template` |
-| `premium` | `string` | 同 `variant.premium` |
-| `layout` | `string` | 布局标识 |
-| `width` | `number` | 样式宽度（像素） |
-| `height` | `number` | 样式高度（像素） |
-| `transparentBackground` | `boolean` | 是否请求透明背景 |
+基卡解析适用于每次渲染，而不仅是 `partial-update`：它决定哪张卡提供渲染骨架（Actor prefab 与 CardDef 资产）。对于 `partial-update`，它额外提供基础字段值。
 
 #### `output`
 
@@ -281,7 +288,7 @@
 
 | 字段 | 类型 | 说明 |
 |-------|------|-------------|
-| `cardId` | `string` | 卡牌标识 |
+| `cardId` | `string` | 目标卡标识——正在渲染的卡牌 |
 | `lang` | `string` | 语言代码 |
 | `templateVersion` | `string` | 模板版本 |
 | `assetVersion` | `string` | 资源版本 |
@@ -324,11 +331,11 @@
 
 支持的规范 `GlowPart` 值：
 
-`cost | attack | health | text | armor | rune | rarity | art | name | race | tech-level`
+`cost | attack | health | text | armor | rune | rarity | art | name | race | tech-level | trinket-size | spell-school`
 
 `durability` 是 `health` 的可接受别名，渲染器必须将二者应用到同一个视觉区域。
 
-规范部位映射为：`cost -> ManaCost`、`attack -> Attack`、`health`/`durability -> Health`、`text -> CardText`、`armor -> Armor`、`rune -> Runes`、`rarity -> RarityGem`、`art -> Art`、`name -> CardName`、`race -> Race`、`tech-level -> TechLevel`。部位值合法但当前卡牌或 prefab 不支持时静默忽略。`tech-level` 用于高亮酒馆战棋的旅店等级徽章。同一视觉区域的同类型重复项合并，不同类型冲突则拒绝请求。
+规范部位映射为：`cost -> ManaCost`、`attack -> Attack`、`health`/`durability -> Health`、`text -> CardText`、`armor -> Armor`、`rune -> Runes`、`rarity -> RarityGem`、`art -> Art`、`name -> CardName`、`race -> Race`、`tech-level -> TechLevel`、`trinket-size -> TrinketSizeBadge`、`spell-school -> SpellSchool`。部位值合法但当前卡牌或 prefab 不支持时静默忽略。`tech-level` 用于高亮酒馆战棋随从与酒馆法术的旅店等级徽章。在酒馆法术上，`cost` 渲染铸币光效而非法力宝石；在其他卡牌上，`cost` 仍渲染法力宝石。在英雄技能与酒馆饰品的 `text` 会在描述文本上渲染运行时形状 quad（这些 actor 没有可用的官方 glow 节点）；其他卡牌的 `text` 使用官方文本 glow 节点。`trinket-size` 用于高亮酒馆饰品（带 GREATER/LESSER 法术派系）的大型/小型级别徽章。`spell-school` 用于高亮法术派系标识（锚定在法术的描述网格上，位于描述框最下方），适用于带非 NONE 法术派系的法术。同一视觉区域的同类型重复项合并，不同类型冲突则拒绝请求。
 
 #### `renderMechanics`
 
@@ -416,16 +423,22 @@
 
 - 对一个有效请求返回一个有效 PNG 二进制
 - 每次请求只渲染一张图
-- 将 `full-set` 请求视为完整、自包含的渲染输入；对于 `partial-update`，使用 `card` 从内部游戏数据解析基础状态
+- 将 `full-set` 请求视为完整、自包含的渲染输入；对于 `partial-update`，从解析后的基卡解析基础状态
+- 在每次渲染中解析基卡：提供 `override.cardId` 时使用它，否则目标卡 `renderModel.cardId` 能解析到游戏数据时使用目标卡，否则按 `renderModel.type` 选择默认模板卡（复用 placeholder 模板卡选择）；当 `override.cardId` 指定但不在游戏数据中时返回 `422`，当 `override.cardId` 未指定、`renderModel.cardId` 不可解析且 `renderModel.type` 缺失时返回 `422`
+- 将 `renderModel` 的所有显示字段覆盖到基卡之上
+- 提供 `override.portraitImage`（base64 PNG）时将其注入为卡面图，仅支持 `normal` 与 `golden` 品质；`portraitImage` 与 `diamond` 或 `signature` 品质组合时返回 `422`
+- 未提供 `portraitImage` 时，使用基卡 CardDef 的卡面图，支持所有品质
+- 以 `renderModel.cardId` 标识目标卡
 - 遵守 `output.width` 和 `output.height`
 - 支持炉石卡图渲染所需的 `variant` 与 `renderModel`
-- 要求 `card.cardId` 与 `renderModel.cardId` 指向同一张卡牌
-- 要求 `style.category`、`style.zone`、`style.template` 和 `style.premium` 与 `variant` 一致
-- 要求 `style.width`、`style.height` 与 `output.width`、`output.height` 一致
-- 要求 `style.transparentBackground` 与 `output.transparentBackground` 一致
 - 当且仅当 `renderModel.glow` 非空时，要求 `variant.category` 为 `"glow"`；否则必须为 `"base"`
 - 仅当 `variant.zone` 为 `"hand"` 时接受 `renderModel.glow`；`"play"` 渲染不得携带 glow 标记
 - 按每个标记声明的 `buff`、`nerf`、`rework` 或 `neutral` 样式渲染所有受支持的 `renderModel.glow` 标记
+- 当卡牌为酒馆战棋随从或酒馆法术时，按声明的样式渲染 `tech-level`
+- 在酒馆法术上，使用铸币光效渲染 `cost`；否则渲染为法力宝石
+- 英雄技能或酒馆饰品的 `text` 在描述文本上渲染为运行时形状 quad；否则渲染为官方文本 glow 节点
+- 当卡牌为带 GREATER/LESSER 法术派系的酒馆饰品时，按声明的样式渲染 `trinket-size`
+- 当卡牌为带非 NONE 法术派系的法术时，按声明的样式渲染 `spell-school`
 - 将 glow 部位 `durability` 作为 `health` 的同义词处理
 - 提供 `GET /status` 供可用性与兼容性检查
 
