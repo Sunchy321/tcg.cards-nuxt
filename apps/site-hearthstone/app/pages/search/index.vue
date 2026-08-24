@@ -183,8 +183,8 @@
               <!-- Class -->
               <div class="rounded-2xl overflow-hidden backdrop-blur-sm shadow-[0_4px_16px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.05)] border border-[rgba(180,120,50,0.25)] bg-[rgba(50,28,8,0.75)] break-inside-avoid mb-4">
                 <div class="px-5 pt-4">
-                  <div class="flex items-center gap-2 text-sm font-medium text-amber-300/80 mb-2 [&_svg]:size-4">
-                    <UIcon name="i:hearthstone-class-neutral" class="w-5 h-5" />
+                  <div class="flex items-center gap-2 text-sm font-medium text-amber-300/80 mb-2">
+                    <img :src="classIconUrl('neutral')" alt="" class="w-5 h-5" />
                     <span>{{ $t('hearthstone.search.command.class') }}</span>
                   </div>
                   <div class="panel-divider"/>
@@ -198,7 +198,7 @@
                       :class="{ active: state.classes.includes(item.value) }"
                       @click="toggleMulti(state.classes, item.value)"
                     >
-                      <UIcon :name="classIconName(item.value)" class="chip-icon" />
+                      <img :src="classIconUrl(item.value)" alt="" class="chip-icon" />
                       <span class="whitespace-nowrap">{{ item.label }}</span>
                     </button>
                   </div>
@@ -1242,8 +1242,8 @@ const validateNumericInput = (event: Event) => {
   }
 };
 
-/** Returns the bundled Hearthstone class icon name for a search filter. */
-const classIconName = (value: string) => `i:hearthstone-class-${value.replaceAll('_', '-')}`;
+/** Returns the public URL of the Hearthstone class icon image for a search filter. */
+const classIconUrl = (value: string) => `/icons/hearthstone/classes/${value.replaceAll('_', '-')}.png`;
 </script>
 
 <style lang="scss" scoped>
