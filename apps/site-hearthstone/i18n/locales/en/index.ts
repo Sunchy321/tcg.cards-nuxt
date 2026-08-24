@@ -495,6 +495,7 @@ export default {
       bg_trinket:      'Battlegrounds trinkets',
       bg_tavern_spell: 'Battlegrounds spells',
       bg_anomaly:      'Battlegrounds anomalies',
+      bg_buddy:        'Battlegrounds buddies',
       bg_timewarped:   'Battlegrounds Timewarped',
       bg_dm_prize:     'Battlegrounds Darkmoon Faire prizes',
       quest:           'Quest cards',

@@ -1100,9 +1100,9 @@ watch(
   entries => {
     for (const entry of entries) {
       const item = form.items.find(it => it._key === entry.key);
-      // A manually-special group like bg_dm_prize (not derivable from card type)
-      // must survive auto-alignment regardless of the _groupAuto flag.
-      if (!item || item._groupAuto === false || item.group === 'bg_dm_prize') continue;
+      // Manually-special bg groups not derivable from card type must survive
+      // auto-alignment regardless of the _groupAuto flag.
+      if (!item || item._groupAuto === false || item.group === 'bg_dm_prize' || item.group === 'bg_buddy') continue;
       const derived = deriveGroup(entry.format, entry.type, entry.isTimewarped);
       if (derived && item.group !== derived) item.group = derived;
     }
@@ -1150,6 +1150,7 @@ const GROUP_LABELS: Record<string, string> = {
   bg_trinket:      '战棋饰品',
   bg_tavern_spell: '战棋酒馆法术',
   bg_anomaly:      '战棋畸变',
+  bg_buddy:        '战棋伙伴',
   bg_timewarped:   '战棋时空扭曲',
   bg_dm_prize:     '战棋暗月奖品',
 };

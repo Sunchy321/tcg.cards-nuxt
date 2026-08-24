@@ -501,6 +501,7 @@ export default {
       bg_trinket:      '战棋饰品',
       bg_tavern_spell: '战棋法术',
       bg_anomaly:      '战棋畸变',
+      bg_buddy:        '战棋伙伴',
       bg_timewarped:   '战棋时空扭曲',
       bg_dm_prize:     '战棋暗月奖品',
       quest:           '任务牌',
