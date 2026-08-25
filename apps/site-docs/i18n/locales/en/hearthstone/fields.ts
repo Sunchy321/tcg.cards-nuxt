@@ -140,12 +140,13 @@ export default {
       out: {
         setId:        'Unique set ID.',
         dbfId:        'Dbf (data) ID of the set.',
-        slug:         'URL-friendly slug of the set.',
-        rawName:      'Original (unlocalized) set name.',
+        rawName:      'CARD_SET enum name of the set.',
         localization: {
-          _self: 'Localized set details.',
-          lang:  'Language code.',
-          name:  'Localized set name.',
+          _self:    'Localized set names keyed by language.',
+          full:     'Full set name.',
+          short:    'Short set name (collection filter).',
+          initials: 'Searchable shorthand names.',
+          mini:     'Mini-set name (when the set has one).',
         },
         type:          'Set type.',
         releaseDate:   'Release date of the set.',

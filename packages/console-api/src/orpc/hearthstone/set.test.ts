@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test';
 type TableName
   = | 'announcement_items'
     | 'entities'
-    | 'set_localizations'
     | 'sets';
 
 /** Simplified drizzle column descriptor for the memory db. */
@@ -21,20 +20,13 @@ interface Table {
 interface SetRow {
   setId:         string;
   dbfId:         number | null;
-  slug:          string | null;
   rawName:       string | null;
+  localization:  Record<string, unknown>;
   type:          string;
   releaseDate:   string;
   cardCountFull: number | null;
   cardCount:     number | null;
   group:         string | null;
-}
-
-/** Stored Hearthstone set localization row used by the memory db. */
-interface SetLocalizationRow {
-  setId: string;
-  lang:  string;
-  name:  string;
 }
 
 /** Stored Hearthstone entity row used by the memory db. */
@@ -53,14 +45,12 @@ interface AnnouncementItemRow {
 type Row
   = | AnnouncementItemRow
     | EntityRow
-    | SetLocalizationRow
     | SetRow;
 
 /** Memory db state used by the rename tests. */
 interface MemoryState {
   announcementItems: AnnouncementItemRow[];
   entities:          EntityRow[];
-  setLocalizations:  SetLocalizationRow[];
   sets:              SetRow[];
 }
 
@@ -80,19 +70,13 @@ function table(tableName: TableName, columns: string[]): Table & Record<string, 
 const Set = table('sets', [
   'setId',
   'dbfId',
-  'slug',
   'rawName',
+  'localization',
   'type',
   'releaseDate',
   'cardCountFull',
   'cardCount',
   'group',
-]);
-
-const SetLocalization = table('set_localizations', [
-  'setId',
-  'lang',
-  'name',
 ]);
 
 const Entity = table('entities', [
@@ -357,7 +341,6 @@ class MemorySetDb {
   /** Stored rows read for one mocked table. */
   readRows(tableName: TableName): Row[] {
     if (tableName === 'sets') return this.state.sets;
-    if (tableName === 'set_localizations') return this.state.setLocalizations;
     if (tableName === 'entities') return this.state.entities;
     return this.state.announcementItems;
   }
@@ -365,7 +348,6 @@ class MemorySetDb {
   /** Stored rows inserted into one mocked table. */
   insertRows(tableName: TableName, rows: Row[]) {
     if (tableName === 'sets') this.state.sets.push(...rows as SetRow[]);
-    else if (tableName === 'set_localizations') this.state.setLocalizations.push(...rows as SetLocalizationRow[]);
     else if (tableName === 'entities') this.state.entities.push(...rows as EntityRow[]);
     else this.state.announcementItems.push(...rows as AnnouncementItemRow[]);
   }
@@ -386,7 +368,6 @@ class MemorySetDb {
     const deleted = rows.filter(row => matchesCondition(row, condition)).map(row => structuredClone(row));
 
     if (tableName === 'sets') this.state.sets = kept as SetRow[];
-    else if (tableName === 'set_localizations') this.state.setLocalizations = kept as SetLocalizationRow[];
     else if (tableName === 'entities') this.state.entities = kept as EntityRow[];
     else this.state.announcementItems = kept as AnnouncementItemRow[];
 
@@ -398,7 +379,6 @@ class MemorySetDb {
     return {
       announcementItems: [],
       entities:          [],
-      setLocalizations:  [],
       sets:              [],
     };
   }
@@ -412,7 +392,6 @@ mock.module('@tcg-cards/db/schema/shared/hearthstone', () => ({
   BaseEntity: Entity,
   Entity,
   Set,
-  SetLocalization,
 }));
 
 const { updateSetProfile } = await import('./set');
@@ -422,8 +401,8 @@ function makeSet(setId: string): SetRow {
   return {
     setId,
     dbfId:         10,
-    slug:          null,
     rawName:       null,
+    localization:  {},
     type:          'unknown',
     releaseDate:   '',
     cardCountFull: null,
@@ -439,7 +418,6 @@ beforeEach(() => {
 describe('updateSetProfile', () => {
   test('renames setId and syncs dependent tables', async () => {
     memoryDb.state.sets.push(makeSet('__hsdata_missing_set_dbf_10'));
-    memoryDb.state.setLocalizations.push({ setId: '__hsdata_missing_set_dbf_10', lang: 'en', name: 'Placeholder' });
     memoryDb.state.entities.push({ cardId: 'CARD_001', set: '__hsdata_missing_set_dbf_10' });
     memoryDb.state.announcementItems.push({ id: 'announcement-1', setId: '__hsdata_missing_set_dbf_10' });
 
@@ -447,39 +425,36 @@ describe('updateSetProfile', () => {
       originalSetId: '__hsdata_missing_set_dbf_10',
       setId:         'CORE',
       dbfId:         10,
-      slug:          'core',
       rawName:       'CORE',
       type:          'core',
       releaseDate:   '2024-01-01',
       cardCountFull: 145,
       cardCount:     145,
       group:         null,
-      localization:  [
-        { lang: 'en', name: 'Core' },
-        { lang: 'zhs', name: '核心' },
-      ],
+      localization:  {
+        en:  { full: 'Core' },
+        zhs: { full: '核心' },
+      },
     });
 
     expect(result).toMatchObject({
       setId:       'CORE',
       dbfId:       10,
-      slug:        'core',
       rawName:     'CORE',
       type:        'core',
       releaseDate: '2024-01-01',
     });
+    expect(result.localization).toEqual({
+      en:  { full: 'Core' },
+      zhs: { full: '核心' },
+    });
     expect(memoryDb.state.sets).toEqual([
       expect.objectContaining({
         setId:       'CORE',
-        slug:        'core',
         rawName:     'CORE',
         type:        'core',
         releaseDate: '2024-01-01',
       }),
-    ]);
-    expect(memoryDb.state.setLocalizations).toEqual([
-      { setId: 'CORE', lang: 'en', name: 'Core' },
-      { setId: 'CORE', lang: 'zhs', name: '核心' },
     ]);
     expect(memoryDb.state.entities[0]?.set).toBe('CORE');
     expect(memoryDb.state.announcementItems[0]?.setId).toBe('CORE');
@@ -494,14 +469,13 @@ describe('updateSetProfile', () => {
       originalSetId: 'CORE',
       setId:         'EXPERT1',
       dbfId:         10,
-      slug:          null,
       rawName:       null,
       type:          'core',
       releaseDate:   '',
       cardCountFull: null,
       cardCount:     null,
       group:         null,
-      localization:  [],
+      localization:  {},
     })).rejects.toThrow('Set EXPERT1 already exists');
 
     expect(memoryDb.state).toEqual(snapshot);
