@@ -125,7 +125,7 @@ Use Conventional Commits for all commit messages.
 
 Keep commit messages to a single line. Only include body text when explicitly requested.
 
-Do not create commits directly. Always show the proposed commit message to the user first, wait for explicit confirmation, and only then create the commit.
+When the user asks to commit, create the commit directly without waiting for confirmation of the commit message, then show the commit message after the commit is created.
 
 Use the most specific reasonable scope when writing commit messages. Follow the repository's existing style and prefer fine-grained scopes such as `console/magic`, `db/magic`, `watcher/magic`, `hearthstone`, `ui`, or `sync` instead of broad generic scopes when applicable.
 
