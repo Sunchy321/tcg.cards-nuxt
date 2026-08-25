@@ -25,6 +25,7 @@
               <span>{{ sourceLabel(item.source) }}</span>
             </div>
           </div>
+          <UBadge :label="`${item.itemCount ?? 0} 条`" color="neutral" variant="soft" size="xs" class="shrink-0" />
           <UButton icon="i-lucide-trash-2" color="error" variant="ghost" size="xs" class="opacity-0 group-hover:opacity-100" @click.stop="confirmDelete(item)" />
         </div>
         <p v-if="announcements.length === 0 && !loading" class="py-8 text-center text-sm text-slate-400">暂无公告</p>
