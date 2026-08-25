@@ -24,6 +24,8 @@ const input = z.object({
 const output = z.object({
   announcementCount: z.number(),
   itemCount:         z.number(),
+  totalRowCount:     z.number(),
+  changedRowCount:   z.number(),
   dryRun:            z.boolean(),
 });
 
@@ -79,9 +81,12 @@ export const announcementPublishTaskDefinition = createDefinition(announcementPu
       }
     }
 
+    const totalRowCount = localAnnouncements.length + localItems.length;
     return {
       announcementCount: localAnnouncements.length,
       itemCount:         localItems.length,
+      totalRowCount,
+      changedRowCount:   totalRowCount,
       dryRun,
     };
   })
