@@ -197,7 +197,14 @@
                     />
                   </UFormField>
                   <!-- Non-card types: single ID field row -->
-                  <UFormField v-if="idKindOf(item.type) === 'set'" label="系列ID"><UInput v-model="item.setId" autocomplete="off" autocapitalize="none" spellcheck="false" /></UFormField>
+                  <UFormField v-if="idKindOf(item.type) === 'set'" label="系列ID">
+                    <div class="flex items-center gap-1">
+                      <div class="min-w-0 flex-1">
+                        <SetSearchSelect v-model="item.setId" :search="searchSets" :resolve="resolveSetNames" />
+                      </div>
+                      <UButton icon="i-lucide-list-plus" size="sm" variant="ghost" title="批量插入系列（按本条目配置）" @click="openBatchInsert(item)" />
+                    </div>
+                  </UFormField>
                   <UFormField v-else-if="idKindOf(item.type) === 'rule'" label="规则ID"><UInput v-model="item.ruleId" autocomplete="off" autocapitalize="none" spellcheck="false" /></UFormField>
 
                   <!-- Card types: identity, glow, and previews -->
@@ -349,7 +356,7 @@
       </template>
     </UModal>
 
-    <UModal v-model:open="batchInsertOpen" title="批量插入卡牌" class="sm:max-w-3xl">
+    <UModal v-model:open="batchInsertOpen" :title="batchKind === 'set' ? '批量插入系列' : '批量插入卡牌'" class="sm:max-w-3xl">
       <template #body>
         <div class="space-y-4">
           <p class="text-xs text-slate-600">
@@ -357,8 +364,8 @@
           </p>
           <div class="flex gap-4">
             <div class="w-2/5">
-              <UFormField label="卡牌名称（每行一个）">
-                <UTextarea v-model="batchNames" :rows="10" class="h-full w-full" placeholder="每行一个卡牌名称，如：魔术师的高帽" @update:model-value="batchResolved = []" />
+              <UFormField :label="batchKind === 'set' ? '系列名称/ID（每行一个）' : '卡牌名称（每行一个）'">
+                <UTextarea v-model="batchNames" :rows="10" class="h-full w-full" :placeholder="batchKind === 'set' ? '每行一个系列名称或ID，如：核心 / CORE' : '每行一个卡牌名称，如：魔术师的高帽'" @update:model-value="batchResolved = []" />
               </UFormField>
             </div>
             <div class="min-w-0 flex-1">
@@ -370,7 +377,7 @@
                   <USelect
                     v-else
                     :model-value="row.selected"
-                    :items="row.candidates.map(c => ({ label: `${c.cardId} · ${c.nameZh ?? c.nameEn ?? ''}`, value: c.cardId }))"
+                    :items="row.candidates.map(c => ({ label: `${c.label} (${c.id})`, value: c.id }))"
                     class="min-w-0 flex-1"
                     @update:model-value="row.selected = String($event)"
                   />
@@ -440,7 +447,7 @@ import type { ChangeStatus, GameChangeType, GlowEntry } from '#model/hearthstone
 import type { ImageRequestOverride } from '#model/hearthstone/schema/data/image';
 import type { RenderModel } from '#model/hearthstone/schema/entity';
 import { mergePreviews, selectPreview, type SidePreview } from '~/utils/announcement-preview';
-import { deriveGroup, idKindOf, serializeItems, type CardSearchResult, type ParseError, type ParsedResult, type ResolvedCardName, type TextItem } from '~/utils/announcement-yaml';
+import { deriveGroup, idKindOf, serializeItems, type ParseError, type ParsedResult, type ResolvedCardName, type TextItem } from '~/utils/announcement-yaml';
 import { isPoolFull } from '@tcg-cards/shared/hearthstone/pool';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
@@ -535,12 +542,21 @@ const batchTemplate = computed(() => (batchInsertIndex.value >= 0 ? form.items[b
 const batchTemplateType = computed(() => batchTemplate.value?.type ?? '');
 const batchTemplateStatus = computed(() => batchTemplate.value?.status ?? '');
 const batchTemplateFormat = computed(() => batchTemplate.value?.format ? batchTemplate.value.format : '全部');
-/** One resolved card name with its candidate matches. */
+/** One batch candidate carrying a display label for card or set. */
+interface BatchCandidate {
+  id:    string;
+  label: string;
+}
+/** One resolved batch input with its candidate matches. */
 interface BatchResolvedItem {
   name:       string;
-  candidates: CardSearchResult[];
+  candidates: BatchCandidate[];
   selected:   string;
 }
+/** Batch insert target kind derived from the template item type. */
+const batchKind = computed<'card' | 'set'>(() =>
+  idKindOf(batchTemplate.value?.type ?? '') === 'set' ? 'set' : 'card',
+);
 const batchResolved = ref<BatchResolvedItem[]>([]);
 const insertableCount = computed(() => batchResolved.value.filter(row => row.selected).length);
 /** Editor view: form editor, YAML text editor, or image-only gallery. */
@@ -633,6 +649,29 @@ function ensureCardMeta(cardId: string) {
 /** Searches cards by English/Chinese name or cardId for the CardSearchSelect widget. */
 function searchCards(query: string, format?: string) {
   return client.hearthstone.announcement.searchCards({ q: query, format });
+}
+
+/** Searches sets by setId or localized name for the SetSearchSelect widget. */
+async function searchSets(query: string): Promise<Array<{ setId: string, name: string | null }>> {
+  const result = await client.hearthstone.set.list({ q: query, limit: 20 });
+  return result.items.map(set => ({
+    setId: set.setId,
+    name:  set.localization.zhs?.full ?? set.localization.en?.full ?? null,
+  }));
+}
+
+/** Resolves set display names by exact setId for the SetSearchSelect widget. */
+async function resolveSetNames(setIds: string[]): Promise<Array<{ setId: string, name: string | null }>> {
+  const result: Array<{ setId: string, name: string | null }> = [];
+  for (const setId of setIds) {
+    try {
+      const set = await client.hearthstone.set.get({ setId });
+      result.push({ setId, name: set.localization.zhs?.full ?? set.localization.en?.full ?? null });
+    } catch {
+      result.push({ setId, name: null });
+    }
+  }
+  return result;
 }
 
 interface ResolveWaiter {
@@ -1678,8 +1717,9 @@ function openBatchInsert(item: ItemForm) {
   batchInsertOpen.value = true;
 }
 
-/** Builds a new item that clones the template's config but targets one card. */
-function batchItemFrom(template: ItemForm, cardId: string): ItemForm {
+/** Builds a new item that clones the template's config but targets one card or set. */
+function batchItemFrom(template: ItemForm, id: string): ItemForm {
+  const isSet = idKindOf(template.type) === 'set';
   return {
     ...emptyItem(),
     type:          template.type,
@@ -1689,7 +1729,8 @@ function batchItemFrom(template: ItemForm, cardId: string): ItemForm {
     version:       template.version,
     lastVersion:   template.lastVersion,
     effectiveDate: template.effectiveDate,
-    cardId,
+    cardId:        isSet ? '' : id,
+    setId:         isSet ? id : '',
     _groupAuto:    template._groupAuto,
   };
 }
@@ -1704,8 +1745,21 @@ async function resolveBatchNames() {
   try {
     const rows: BatchResolvedItem[] = [];
     for (const name of names) {
-      const candidates = await searchCards(name, template.format || undefined);
-      rows.push({ name, candidates, selected: candidates[0]?.cardId ?? '' });
+      if (batchKind.value === 'set') {
+        const result = await client.hearthstone.set.list({ q: name, limit: 50 });
+        const candidates: BatchCandidate[] = result.items.map(set => ({
+          id:    set.setId,
+          label: set.localization.zhs?.full ?? set.localization.en?.full ?? set.setId,
+        }));
+        rows.push({ name, candidates, selected: candidates[0]?.id ?? '' });
+      } else {
+        const matches = await searchCards(name, template.format || undefined);
+        const candidates: BatchCandidate[] = matches.map(card => ({
+          id:    card.cardId,
+          label: card.nameZh ?? card.nameEn ?? card.cardId,
+        }));
+        rows.push({ name, candidates, selected: candidates[0]?.id ?? '' });
+      }
     }
     batchResolved.value = rows;
   } finally {
@@ -1720,17 +1774,19 @@ async function confirmBatchInsert() {
   if (!template) return;
   const selected = batchResolved.value
     .map(row => row.selected)
-    .filter((cardId): cardId is string => !!cardId);
+    .filter((id): id is string => !!id);
   if (selected.length === 0) return;
+  const isSet = idKindOf(template.type) === 'set';
   batchInserting.value = true;
   try {
-    // The template itself fills the first selected card when it has none.
+    // The template itself fills the first selected id when it has none.
     const newItems: ItemForm[] = [];
-    if (!template.cardId) {
-      template.cardId = selected[0]!;
-      for (const cardId of selected.slice(1)) newItems.push(batchItemFrom(template, cardId));
+    if (isSet ? !template.setId : !template.cardId) {
+      if (isSet) template.setId = selected[0]!;
+      else template.cardId = selected[0]!;
+      for (const id of selected.slice(1)) newItems.push(batchItemFrom(template, id));
     } else {
-      for (const cardId of selected) newItems.push(batchItemFrom(template, cardId));
+      for (const id of selected) newItems.push(batchItemFrom(template, id));
     }
     if (newItems.length > 0) form.items.splice(index + 1, 0, ...newItems);
     const skipped = batchResolved.value.filter(row => !row.selected).length;
