@@ -13,6 +13,7 @@ import {
 import { createDefinition } from '#task/definition';
 import { getLocalDb } from '../../hsdata-local-db';
 import { requireHearthstonePublishTargetByIdentity } from '../../hsdata-publish-target';
+import { chunkValues } from '../../hsdata-publish';
 
 export const announcementPublishTaskType = 'hearthstone_announcement_publish';
 
@@ -63,14 +64,15 @@ export const announcementPublishTaskDefinition = createDefinition(announcementPu
       const remoteDb = createDb(target.connectionString);
       try {
         // Full mirror: replace the remote tables with the local rows (ids are
-        // preserved UUIDs, so existing site references stay valid).
+        // preserved UUIDs, so existing site references stay valid). Inserts are
+        // chunked so a large item set stays under the driver's parameter limit.
         await remoteDb.delete(RemoteAnnouncementItem);
         await remoteDb.delete(RemoteAnnouncement);
-        if (localAnnouncements.length > 0) {
-          await remoteDb.insert(RemoteAnnouncement).values(localAnnouncements);
+        for (const chunk of chunkValues(localAnnouncements)) {
+          await remoteDb.insert(RemoteAnnouncement).values(chunk);
         }
-        if (localItems.length > 0) {
-          await remoteDb.insert(RemoteAnnouncementItem).values(localItems);
+        for (const chunk of chunkValues(localItems)) {
+          await remoteDb.insert(RemoteAnnouncementItem).values(chunk);
         }
       } finally {
         await remoteDb.$client.end({ timeout: 1 });
