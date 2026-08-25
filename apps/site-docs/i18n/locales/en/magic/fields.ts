@@ -34,7 +34,7 @@ export default {
           tags:             'Searchable tags attached to the card.',
           category:         'Card category (e.g. spell).',
           legalities:       'Legal status of the card per format.',
-          contentWarning:   'Whether the card carries a content warning.',
+          hasContentWarning: 'Whether the card carries a content warning.',
           scryfallOracleId: 'Scryfall oracle ID of the card.',
         },
         localization: {

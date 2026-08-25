@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { updation } from '../../common';
 import { fullImageType, locale, layout, rarity } from './basic';
 import { card as card, cardLocalization, cardPart, cardPartLocalization } from './card';
 
@@ -21,10 +20,12 @@ export type Game = z.infer<typeof game>;
 export type ScryfallFace = z.infer<typeof scryfallFace>;
 
 export const print = z.strictObject({
-  cardId: z.string(),
-  set:    z.string(),
-  number: z.string(),
-  lang:   locale,
+  cardId:  z.string(),
+  version: z.string().default(''),
+  set:     z.string(),
+  number:  z.string(),
+  lang:    locale,
+  source:  z.string().default(''),
 
   name:     z.string(),
   typeline: z.string(),
@@ -46,6 +47,7 @@ export const print = z.strictObject({
   finishes:        finish.array(),
   hasHighResImage: z.boolean(),
   imageStatus,
+  imageUpdatedAt:  z.string().nullable(),
   fullImageType,
 
   inBooster: z.boolean(),
@@ -57,24 +59,34 @@ export const print = z.strictObject({
 
   printTags: z.string().array(),
 
+  isVariation: z.boolean().default(false),
+  variationOf: z.uuid().nullable(),
+
+  artistIds:      z.uuid().array().default([]),
+  illustrationId: z.uuid().nullable(),
+  resourceId:     z.string().nullable(),
+
   scryfallOracleId:  z.uuid(),
   scryfallCardId:    z.uuid().nullable(),
   scryfallFace:      scryfallFace.nullable(),
   scryfallImageUris: z.record(z.string(), z.url()).array().nullable(),
 
-  arenaId:      z.int().nullable(),
-  mtgoId:       z.int().nullable(),
-  mtgoFoilId:   z.int().nullable(),
-  multiverseId: z.int().array(),
-  tcgPlayerId:  z.int().nullable(),
-  cardMarketId: z.int().nullable(),
+  arenaId:           z.int().nullable(),
+  mtgoId:            z.int().nullable(),
+  mtgoFoilId:        z.int().nullable(),
+  multiverseId:      z.int().array(),
+  tcgPlayerId:       z.int().nullable(),
+  tcgplayerEtchedId: z.int().nullable(),
+  cardMarketId:      z.int().nullable(),
 });
 
 export const printPart = z.strictObject({
   cardId:    print.shape.cardId,
+  version:   print.shape.version,
   set:       print.shape.set,
   number:    print.shape.number,
   lang:      print.shape.lang,
+  source:    print.shape.source,
   partIndex: cardPart.shape.partIndex,
 
   name:     z.string(),
@@ -93,41 +105,49 @@ export const printPart = z.strictObject({
 
 export const printView = z.strictObject({
   cardId:    print.shape.cardId,
+  version:   print.shape.version,
   set:       print.shape.set,
   number:    print.shape.number,
   lang:      print.shape.lang,
+  source:    print.shape.source,
   partIndex: printPart.shape.partIndex,
 
   print: print.omit({
-    cardId: true,
-    set:    true,
-    number: true,
-    lang:   true,
+    cardId:  true,
+    version: true,
+    set:     true,
+    number:  true,
+    lang:    true,
+    source:  true,
   }),
 
   printPart: printPart.omit({
     cardId:    true,
+    version:   true,
     set:       true,
     number:    true,
     lang:      true,
+    source:    true,
     partIndex: true,
   }),
 });
 
 export const cardPrintView = z.object({
   cardId:    card.shape.cardId,
+  version:   card.shape.version,
   locale:    cardLocalization.shape.locale,
+  source:    cardLocalization.shape.source,
   set:       print.shape.set,
   number:    print.shape.number,
   lang:      print.shape.lang,
   partIndex: cardPart.shape.partIndex,
 
-  card:                 card.omit({ cardId: true }),
-  cardLocalization:     cardLocalization.omit({ cardId: true, locale: true }),
-  cardPart:             cardPart.omit({ cardId: true, partIndex: true }),
-  cardPartLocalization: cardPartLocalization.omit({ cardId: true, partIndex: true, locale: true }),
-  print:                print.omit({ cardId: true, set: true, number: true, lang: true }),
-  printPart:            printPart.omit({ cardId: true, set: true, number: true, lang: true, partIndex: true }),
+  card:                 card.omit({ cardId: true, version: true }),
+  cardLocalization:     cardLocalization.omit({ cardId: true, version: true, locale: true, source: true }),
+  cardPart:             cardPart.omit({ cardId: true, version: true, partIndex: true }),
+  cardPartLocalization: cardPartLocalization.omit({ cardId: true, version: true, partIndex: true, locale: true, source: true }),
+  print:                print.omit({ cardId: true, version: true, set: true, number: true, lang: true, source: true }),
+  printPart:            printPart.omit({ cardId: true, version: true, set: true, number: true, lang: true, source: true, partIndex: true }),
 });
 
 export const version = z.strictObject({
@@ -140,41 +160,25 @@ export const version = z.strictObject({
 
 export const cardEditorView = z.strictObject({
   cardId:    card.shape.cardId,
+  version:   card.shape.version,
   locale:    cardLocalization.shape.locale,
+  source:    cardLocalization.shape.source,
   set:       print.shape.set,
   number:    print.shape.number,
   lang:      print.shape.lang,
   partIndex: cardPart.shape.partIndex,
 
-  card: cardPrintView.shape.card.extend({
-    __lockedPaths: z.string().array().default([]),
-    __updations:   updation.array().default([]),
-  }),
+  card: cardPrintView.shape.card,
 
-  cardLocalization: cardPrintView.shape.cardLocalization.extend({
-    __lockedPaths: z.string().array().default([]),
-    __updations:   updation.array().default([]),
-  }),
+  cardLocalization: cardPrintView.shape.cardLocalization,
 
-  cardPart: cardPrintView.shape.cardPart.extend({
-    __lockedPaths: z.string().array().default([]),
-    __updations:   updation.array().default([]),
-  }),
+  cardPart: cardPrintView.shape.cardPart,
 
-  cardPartLocalization: cardPrintView.shape.cardPartLocalization.extend({
-    __lockedPaths: z.string().array().default([]),
-    __updations:   updation.array().default([]),
-  }),
+  cardPartLocalization: cardPrintView.shape.cardPartLocalization,
 
-  print: cardPrintView.shape.print.extend({
-    __lockedPaths: z.string().array().default([]),
-    __updations:   updation.array().default([]),
-  }),
+  print: cardPrintView.shape.print,
 
-  printPart: cardPrintView.shape.printPart.extend({
-    __lockedPaths: z.string().array().default([]),
-    __updations:   updation.array().default([]),
-  }),
+  printPart: cardPrintView.shape.printPart,
 
   relatedCards: z.strictObject({
     relation: z.string(),

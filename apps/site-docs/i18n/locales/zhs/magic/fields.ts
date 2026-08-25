@@ -34,7 +34,7 @@ export default {
           tags:             '附加到卡牌的可搜索标签。',
           category:         '卡牌类别(如咒语)。',
           legalities:       '卡牌在各赛制中的合法性。',
-          contentWarning:   '卡牌是否带有内容警告。',
+          hasContentWarning: '卡牌是否带有内容警告。',
           scryfallOracleId: '卡牌的 Scryfall oracle ID。',
         },
         localization: {

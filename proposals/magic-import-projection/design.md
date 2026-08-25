@@ -39,11 +39,11 @@
 | 来源 | 职责 | 状态 |
 |------|------|------|
 | Scryfall | 绝大多数卡牌数据 + 数据骨架（oracle 卡、印刷、系列、裁定） | 确认 |
-| Gatherer | Scryfall 缺失的官方本地化，以 multiverseId 为钩子 | 确认 |
-| MTGCH | 非官方本地化文本 | 确认 |
-| MTGJSON | Set 相关数据（仍以 Scryfall 为骨架），暂不涉及 card | 待 API 复查 |
+| Gatherer | Scryfall 缺失的**官方本地化**，以 multiverseId 为钩子；无官方 API，**逆向 Nuxt hydration** 提取 | 确认 |
+| MTGCH | 非官方本地化（导出 JSONL 数据集，无网页 API） | 确认 |
+| MTGJSON | Set 相关数据（仍以 Scryfall 为骨架）；**不作简中来源**（简中覆盖仅 33.9%，且局限 2018-2023 窗口，缺历史与 2024 后） | 确认 |
 
-> 分工为**暂定**，需逐源查看各 API 后最终确认（见 §5）。
+> 探测依据：`scripts/magic/probe-mtgjson-zhs.ts`（见 data-sources.md §4.4）。
 
 ## 3. 目标 Schema
 
