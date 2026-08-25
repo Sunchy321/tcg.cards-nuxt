@@ -28,5 +28,8 @@ registerTaskDefinition(referencePublishTaskDefinition);
 import { hearthstonePurgeTaskDefinition } from '../hearthstone/task/purge/definition';
 registerTaskDefinition(hearthstonePurgeTaskDefinition);
 
+import { magicScryfallImportTaskDefinition } from '../magic/task/scryfall-import/definition';
+registerTaskDefinition(magicScryfallImportTaskDefinition);
+
 import { testWorkTaskDefinition } from './test-definition';
 registerTaskDefinition(testWorkTaskDefinition);
