@@ -15,6 +15,7 @@ export interface ConsoleSelectItem {
 export const GAME_LABELS: Record<Game, string> = {
   magic: 'Magic: The Gathering',
   hearthstone: 'Hearthstone',
+  yugioh: 'Yu-Gi-Oh!',
 };
 
 export function resolveGameFromPath(path: string): Game | null {
