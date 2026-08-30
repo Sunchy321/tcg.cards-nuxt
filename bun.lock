@@ -21,6 +21,7 @@
       "name": "tcg-cards-console-desktop",
       "version": "0.1.0",
       "dependencies": {
+        "@ai-sdk/vue": "4.0.31",
         "@codemirror/commands": "^6.7.1",
         "@codemirror/lang-yaml": "^6.1.2",
         "@codemirror/language": "^6.12.3",
@@ -44,6 +45,7 @@
         "@tcg-cards/console-shell": "workspace:*",
         "@tcg-cards/model": "workspace:*",
         "@tcg-cards/ui": "workspace:*",
+        "ai": "7.0.31",
         "better-auth": "^1.5.5",
         "monaco-editor": "^0.55.1",
         "nuxt": "4.3.1",
@@ -69,6 +71,7 @@
         "@orpc/openapi": "^1.14.0",
         "@orpc/server": "^1.14.0",
         "@tcg-cards/api": "workspace:*",
+        "@tcg-cards/auth": "workspace:*",
         "@tcg-cards/db": "workspace:*",
         "@tcg-cards/model": "workspace:*",
         "hono": "^4.10.5",
@@ -185,15 +188,19 @@
     "apps/site-docs": {
       "name": "site-docs",
       "dependencies": {
+        "@better-auth/api-key": "^1.5.5",
         "@iconify-json/lucide": "^1.2.104",
         "@iconify-json/simple-icons": "^1.2.72",
         "@nuxt/icon": "^2.2.1",
         "@nuxt/ui": "4.5.1",
         "@orpc/server": "^1.14.0",
         "@tcg-cards/api": "workspace:*",
+        "@tcg-cards/auth": "workspace:*",
         "@tcg-cards/base": "workspace:*",
+        "@tcg-cards/db": "workspace:*",
         "@tcg-cards/model": "workspace:*",
         "@tcg-cards/ui": "workspace:*",
+        "better-auth": "^1.5.5",
         "markdown-it": "^14.1.1",
         "nuxt": "4.3.1",
         "tailwindcss": "^4.2.2",
@@ -400,6 +407,7 @@
     "packages/auth": {
       "name": "@tcg-cards/auth",
       "dependencies": {
+        "@better-auth/api-key": "^1.5.5",
         "@tcg-cards/base": "workspace:*",
         "better-auth": "^1.5.5",
       },
@@ -4271,6 +4279,8 @@
     "string-width-cjs/emoji-regex": ["emoji-regex@8.0.0", "", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
 
     "tar/yallist": ["yallist@5.0.0", "", {}, "sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw=="],
+
+    "tcg-cards-console-desktop/@ai-sdk/vue": ["@ai-sdk/vue@4.0.31", "", { "dependencies": { "@ai-sdk/provider-utils": "5.0.11", "ai": "7.0.31", "swrv": "^1.2.0" }, "peerDependencies": { "vue": "^3.3.4" } }, "sha512-QB+jAoN0sdqlMgwiI65L212HdDrA91MYR5tMCs5WWGqhIshumy1d7+ExMIXn7XYpRCgo4LpWXOl+cO295T0lpA=="],
 
     "tedious/@types/node": ["@types/node@20.19.35", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-Uarfe6J91b9HAUXxjvSOdiO2UPOKLm07Q1oh0JHxoZ1y8HoqxDAu3gVrsrOHeiio0kSsoVBt4wFrKOm0dKxVPQ=="],
 
