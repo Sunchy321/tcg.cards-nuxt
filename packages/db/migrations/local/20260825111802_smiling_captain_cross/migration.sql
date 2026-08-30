@@ -337,11 +337,17 @@ ALTER TABLE "magic"."prints" DROP COLUMN "print_locked_paths";--> statement-brea
 ALTER TABLE "magic"."prints" DROP COLUMN "print_updations";--> statement-breakpoint
 ALTER TABLE "magic"."print_parts" DROP COLUMN "print_part_locked_paths";--> statement-breakpoint
 ALTER TABLE "magic"."print_parts" DROP COLUMN "print_part_updations";--> statement-breakpoint
+ALTER TABLE "magic"."card_localizations" DROP CONSTRAINT "card_localizations_pkey";--> statement-breakpoint
 ALTER TABLE "magic"."card_localizations" ADD PRIMARY KEY ("card_id","version","locale","source");--> statement-breakpoint
+ALTER TABLE "magic"."card_parts" DROP CONSTRAINT "card_parts_pkey";--> statement-breakpoint
 ALTER TABLE "magic"."card_parts" ADD PRIMARY KEY ("card_id","version","part_index");--> statement-breakpoint
+ALTER TABLE "magic"."card_part_localizations" DROP CONSTRAINT "card_part_localizations_pkey";--> statement-breakpoint
 ALTER TABLE "magic"."card_part_localizations" ADD PRIMARY KEY ("card_id","version","locale","source","part_index");--> statement-breakpoint
+ALTER TABLE "magic"."prints" DROP CONSTRAINT "prints_pkey";--> statement-breakpoint
 ALTER TABLE "magic"."prints" ADD PRIMARY KEY ("card_id","version","set","number","lang","source");--> statement-breakpoint
+ALTER TABLE "magic"."print_parts" DROP CONSTRAINT "print_parts_pkey";--> statement-breakpoint
 ALTER TABLE "magic"."print_parts" ADD PRIMARY KEY ("card_id","version","set","number","lang","source","part_index");--> statement-breakpoint
+ALTER TABLE "magic"."cards" DROP CONSTRAINT "cards_pkey";--> statement-breakpoint
 ALTER TABLE "magic"."cards" ADD PRIMARY KEY ("card_id","version");--> statement-breakpoint
 CREATE INDEX "mtgch_zhs_oracle_oracle_id_idx" ON "magic_data"."mtgch_zhs_oracle" ("oracle_id");--> statement-breakpoint
 CREATE INDEX "scryfall_rulings_oracle_id_idx" ON "magic_data"."scryfall_rulings" ("oracle_id");--> statement-breakpoint
